@@ -13,6 +13,10 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-thejulan%2Fjvault-181717?logo=github)](https://github.com/thejulan/jvault)
 
+<br /><br />
+
+<img src="jvault-screenshot.png" alt="JVault Modern Crypto Dashboard Preview" width="100%" />
+
 </div>
 
 ---
@@ -175,6 +179,7 @@ jvault/
 ├── run.py                         # Unified server launcher & admin CLI utility
 ├── README.md                      # Complete documentation & architecture guide
 ├── LICENSE                        # MIT License
+├── jvault-screenshot.png          # Dashboard UI preview screenshot
 ├── api/
 │   ├── app/
 │   │   ├── config.py              # Configuration manager & path resolutions
@@ -232,9 +237,3 @@ jvault/
 This project is open-source software licensed under the **[MIT License](LICENSE)**.
 
 ---
-
-<div align="center">
-
-**Built with pride by [Julan](https://github.com/thejulan)** • **[JVault GitHub Repository](https://github.com/thejulan/jvault)**
-
-</div>
