@@ -1,0 +1,20 @@
+{
+  "name": "JVault - Crypto Wallets & Payment Gateway",
+  "short_name": "JVault",
+  "start_url": "/#overview",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09090b",
+  "theme_color": "#4f46e5",
+  "description": "Non-custodial multi-chain cryptocurrency gateway, treasury manager, and instant payment links.",
+  "categories": ["finance", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

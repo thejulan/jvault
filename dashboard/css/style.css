@@ -1,0 +1,491 @@
+/* Custom styling and animations for JVault */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+    font-family: var(--font-sans);
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+code, pre, .font-mono {
+    font-family: var(--font-mono);
+}
+
+/* Glassmorphism helpers */
+.glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.4);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.7);
+}
+
+/* Modal Animations & Styling */
+.modal-backdrop {
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-content {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.modal-content::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+.modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-shrink: 0;
+}
+.modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    flex-shrink: 0;
+}
+.modal-root {
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-root .modal-backdrop {
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-root .modal-content {
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease-out;
+    will-change: transform, opacity;
+}
+.modal-hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+.modal-hidden .modal-content {
+    transform: scale(0.97) translateY(8px) !important;
+    opacity: 0 !important;
+}
+
+/* Tab Pane Transitions */
+.tab-pane:not(.hidden) {
+    animation: tabFadeIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes tabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Dropdown Menu Animations */
+.dropdown-menu:not(.hidden),
+.color-palette-menu:not(.hidden) {
+    animation: dropdownFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top right;
+}
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Micro-interactions for Checkboxes & Radios */
+input[type="checkbox"], input[type="radio"] {
+    transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+input[type="checkbox"]:active, input[type="radio"]:active {
+    transform: scale(0.9);
+}
+input[type="checkbox"]:checked, input[type="radio"]:checked {
+    animation: checkmarkPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes checkmarkPop {
+    0% { transform: scale(0.85); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Smooth Interactive Buttons */
+button:not(:disabled) {
+    transition: transform 0.12s ease-out, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+button:not(:disabled):active {
+    transform: scale(0.97);
+}
+
+/* Remove up and down arrows from number inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+}
+
+/* Card Settings Gear & Seamless Fade Hover Actions */
+.wallet-actions-group {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 28px;
+}
+.wallet-actions-group .wallet-gear-trigger {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.wallet-actions-group .wallet-action-buttons {
+    position: absolute;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(6px);
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
+}
+.wallet-actions-group:hover .wallet-gear-trigger,
+.wallet-actions-group.palette-open .wallet-gear-trigger {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+.wallet-actions-group:hover .wallet-action-buttons,
+.wallet-actions-group.palette-open .wallet-action-buttons {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* Wallet Card Status Badges Fade (Hides green dot and pin icon when settings hovered or palette sticky open) */
+.wallet-card-header:has(.wallet-actions-group:hover) .wallet-status-badges,
+.wallet-card-header:has(.wallet-actions-group.palette-open) .wallet-status-badges {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: scale(0.85);
+}
+.wallet-status-badges {
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Address Card Status Badges Fade (Hides Active/Inactive and pin when settings hovered) */
+.addr-card-header:has(.addr-actions-group:hover) .addr-status-badges {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: scale(0.85);
+}
+.addr-status-badges {
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Address tab & cards smooth down-to-up entry animation (staggered cascade) */
+@keyframes addressSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(22px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+#tab-addresses:not(.hidden),
+#tab-payments:not(.hidden) {
+    animation: addressSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.address-card-entry {
+    animation: addressSlideUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--card-index, 0) * 0.055s);
+}
+.payment-row-entry,
+.payment-row-entry td {
+    animation: addressSlideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--row-index, 0) * 0.045s);
+}
+
+/* Hide floating price widget on login screen */
+html:not(.is-authenticated) #floating-price-launcher,
+html:not(.is-authenticated) #floating-price-modal,
+html:not(.is-authenticated) #modal-price-ticker {
+    display: none !important;
+}
+
+/* Address Card Gear & Hover Actions */
+.addr-actions-group {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 28px;
+}
+.addr-actions-group .addr-gear-trigger {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.addr-actions-group .addr-action-buttons {
+    position: absolute;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(6px);
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
+}
+.addr-actions-group:hover .addr-gear-trigger {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+.addr-actions-group:hover .addr-action-buttons {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* Red Hover on Modal Close X Buttons */
+.modal-header button:has(i.ph-x):hover,
+.modal-content button:has(i.ph-x):hover,
+.modal-root button:has(i.ph-x):hover {
+    color: #f43f5e !important;
+    background-color: rgba(244, 63, 94, 0.12) !important;
+    border-color: rgba(244, 63, 94, 0.25) !important;
+    transform: scale(1.08);
+}
+
+/* Tooltip */
+.tooltip-box {
+    position: absolute;
+    z-index: 50;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Toast container - Bottom Right */
+#toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: 440px;
+    width: auto;
+    pointer-events: none;
+}
+.toast-item {
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 310px;
+    max-width: 440px;
+    animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes toast-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+@keyframes toast-slide-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(15px) scale(0.95);
+    }
+}
+
+/* Pulse Glows */
+.glow-emerald {
+    box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+}
+.glow-indigo {
+    box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.25);
+}
+
+/* Tab indicator */
+.nav-tab-active {
+    position: relative;
+}
+.nav-tab-active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #6366f1, #a855f7);
+    border-radius: 9999px;
+}
+
+/* ================= CREDIT CARD STYLING ================= */
+.card-perspective-container {
+    perspective: 1200px;
+}
+
+.credit-card {
+    position: relative;
+    border-radius: 1.5rem;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.15s ease-out, box-shadow 0.25s ease, border-color 0.25s ease;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.45);
+    will-change: transform;
+}
+
+.addr-credit-card,
+.credit-card.cursor-default {
+    cursor: default !important;
+}
+
+.credit-card:hover {
+    box-shadow: 0 24px 50px -12px var(--card-glow-shadow, rgba(99, 102, 241, 0.4));
+}
+
+/* Mouse hover radial glow tracker */
+.card-hover-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 2;
+    border-radius: 1.5rem;
+    transition: opacity 0.25s ease;
+    background: radial-gradient(350px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), var(--card-glow-color, rgba(255, 255, 255, 0.22)), transparent 70%);
+}
+
+.credit-card:hover .card-hover-glow {
+    opacity: 1;
+}
+
+.credit-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 1.5rem;
+    background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.12), transparent 60%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.hero-credit-card {
+    position: relative;
+    border-radius: 1.75rem;
+    overflow: hidden;
+    box-shadow: 0 25px 60px -15px var(--card-glow-shadow, rgba(99, 102, 241, 0.45));
+    animation: heroCardFloat 6s ease-in-out infinite;
+}
+
+@keyframes heroCardFloat {
+    0%, 100% {
+        transform: translateY(0px) rotateX(1deg);
+    }
+    50% {
+        transform: translateY(-8px) rotateX(-2deg);
+    }
+}
+
+.emv-chip {
+    width: 44px;
+    height: 32px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ffd700 0%, #d4af37 50%, #aa820a 100%);
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), inset 0 -1px 2px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(180, 140, 20, 0.8);
+    overflow: hidden;
+}
+.emv-chip-lines {
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(100, 70, 10, 0.4);
+    border-radius: 3px;
+}
+.emv-chip-lines::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(100, 70, 10, 0.4);
+    transform: translateY(-50%);
+}
+.emv-chip-lines::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 45%;
+    width: 1px;
+    background: rgba(100, 70, 10, 0.4);
+}
+.card-embossed {
+    letter-spacing: 0.18em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 -1px 1px rgba(255, 255, 255, 0.15);
+}
+.card-label-embossed {
+    letter-spacing: 0.12em;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}

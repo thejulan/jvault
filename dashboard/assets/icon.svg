@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- JVault Premium Geometric Emblem (Pure Vector Silhouette) -->
+  <!-- Outer Circular Vault Protective Casing -->
+  <circle cx="256" cy="256" r="220" stroke="currentColor" stroke-width="38"/>
+  
+  <!-- Vault Horizontal Locking Crossbolt -->
+  <line x1="55" y1="200" x2="330" y2="200" stroke="currentColor" stroke-width="38"/>
+  
+  <!-- Vault Combination Dial Core with Keyway Hub -->
+  <circle cx="216" cy="200" r="62" stroke="currentColor" stroke-width="38"/>
+  <circle cx="216" cy="200" r="20" fill="currentColor"/>
+  
+  <!-- The Integrated Letter J Pillar & Semicircular Hook -->
+  <path d="M 330 48
+           L 330 328
+           A 75 75 0 0 1 180 328
+           L 180 250" 
+        stroke="currentColor" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

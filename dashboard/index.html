@@ -1,0 +1,2330 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JVault - Multi-Chain Crypto Gateway</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- QRious for QR generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- PWA Manifest & App Icons -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/static/assets/icon.svg">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="JVault">
+    <link rel="apple-touch-icon" href="/static/icons/icon.svg">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v=20261023_4">
+    <style id="auth-state-style">
+        html.is-authenticated #view-login { display: none !important; }
+        html.is-authenticated #view-dashboard { display: flex !important; }
+        html:not(.is-authenticated) #view-login { display: flex !important; }
+        html:not(.is-authenticated) #view-dashboard { display: none !important; }
+    </style>
+</head>
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen antialiased selection:bg-indigo-500 selection:text-white">
+    <script>
+        (function() {
+            try {
+                var token = localStorage.getItem('jvault_token');
+                if (token) {
+                    document.documentElement.classList.add('is-authenticated');
+                    // Pre-fetch wallets immediately on page load / reload / paste
+                    window._walletsFetchPromise = fetch('/api/wallets', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache'
+                        },
+                        cache: 'no-store'
+                    }).then(function(r) {
+                        return r.ok ? r.json() : null;
+                    }).catch(function() { return null; });
+                } else {
+                    document.documentElement.classList.remove('is-authenticated');
+                }
+                var path = window.location.pathname.replace(/^\/+/, '').split('/')[0];
+                var hash = window.location.hash ? window.location.hash.replace('#', '').split('?')[0] : '';
+                var validTabs = ['overview', 'wallets', 'payments', 'settings', 'addresses'];
+                var tab = 'overview';
+                if (validTabs.indexOf(path) !== -1) tab = path;
+                else if (validTabs.indexOf(hash) !== -1) tab = hash;
+                else tab = localStorage.getItem('jvault_active_tab') || 'overview';
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    validTabs.forEach(function(t) {
+                        var el = document.getElementById('tab-' + t);
+                        if (el) {
+                            if (t === tab) el.classList.remove('hidden');
+                            else el.classList.add('hidden');
+                        }
+                    });
+                    document.querySelectorAll('.app-nav-tab').forEach(function(btn) {
+                        var tAttr = btn.getAttribute('data-tab');
+                        if (tAttr === tab || (tab === 'addresses' && tAttr === 'wallets')) {
+                            btn.className = 'app-nav-tab nav-tab-active flex items-center gap-2 py-3 px-3 text-sm font-bold text-zinc-900 dark:text-zinc-100 transition-colors';
+                        } else {
+                            btn.className = 'app-nav-tab flex items-center gap-2 py-3 px-3 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors';
+                        }
+                    });
+                });
+            } catch(e) {}
+        })();
+    </script>
+
+    <!-- ==================== VIEW 1: LOGIN (LEFT / RIGHT SPLIT) ==================== -->
+    <div id="view-login" class="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col lg:flex-row w-full">
+        <!-- Left Side: Project Showcase -->
+        <div class="lg:w-7/12 bg-gradient-to-br from-zinc-900 via-indigo-950 to-zinc-950 p-6 lg:p-10 xl:p-12 flex flex-col justify-between text-white relative overflow-hidden border-b lg:border-b-0 lg:border-r border-zinc-800">
+            <!-- Background Glow -->
+            <div class="absolute -top-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10">
+                <div class="flex items-center gap-3 mb-6">
+                    <img src="/static/assets/logo_inverted.png" alt="JVault Logo" class="w-9 h-9 drop-shadow-md">
+                    <div>
+                        <span class="text-xl font-extrabold tracking-tight">JVault</span>
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-400 block -mt-1">Self-Custodial Gateway</span>
+                    </div>
+                </div>
+
+                <div class="max-w-xl">
+                    <h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight mb-3">
+                        Crypto Wallets & <br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">
+                            Instant Payment Gateway
+                        </span>
+                    </h1>
+                    <p class="text-zinc-400 text-sm leading-relaxed mb-4">
+                        Self-hosted cryptocurrency treasury and blind payment gateway. Manage Bitcoin, Ethereum, Solana, TRON, TON, and EVMs with on-chain balance tracking and Telegram Bot live sync.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-3.5 my-4">
+                <div class="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur">
+                    <div class="flex items-center gap-2.5 mb-1.5">
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                            <i class="ph ph-wallet text-base"></i>
+                        </div>
+                        <h4 class="font-bold text-sm text-zinc-200">Local Multi-Chain</h4>
+                    </div>
+                    <p class="text-xs text-zinc-400 leading-relaxed">BIP39 HD derivation with AES-256-GCM encrypted keystore.</p>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur">
+                    <div class="flex items-center gap-2.5 mb-1.5">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                            <i class="ph ph-lightning text-base"></i>
+                        </div>
+                        <h4 class="font-bold text-sm text-zinc-200">Lowest Network Fees</h4>
+                    </div>
+                    <p class="text-xs text-zinc-400 leading-relaxed">0% platform markup with smart gas routing and direct settlements.</p>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur">
+                    <div class="flex items-center gap-2.5 mb-1.5">
+                        <div class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                            <i class="ph ph-telegram-logo text-base"></i>
+                        </div>
+                        <h4 class="font-bold text-sm text-zinc-200">Telethon Auto-Sync</h4>
+                    </div>
+                    <p class="text-xs text-zinc-400 leading-relaxed">Live Telegram bot updates invoices from Pending to Paid instantly.</p>
+                </div>
+            </div>
+
+            <div class="relative z-10 flex items-center justify-between text-xs text-zinc-500 pt-4 border-t border-zinc-800/80">
+                <span>JVault Gateway v1.1 &bull; Production Ready</span>
+                <span class="flex items-center gap-1.5"><i class="ph ph-lock-key"></i> Local Database Keystore</span>
+            </div>
+        </div>
+
+        <!-- Right Side: Production Login Form -->
+        <div class="lg:w-5/12 p-6 lg:p-10 xl:p-12 flex flex-col justify-center items-center bg-white dark:bg-zinc-900">
+            <div class="w-full max-w-md">
+                <!-- First-Run Notice Banner (shown if no admin user exists) -->
+                <div id="admin-setup-notice" class="hidden p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 text-xs mb-5">
+                    <div class="flex items-center gap-2 font-bold text-sm mb-1">
+                        <i class="ph ph-warning-diamond text-lg shrink-0"></i>
+                        <span>First-Run Setup: Admin Account Required</span>
+                    </div>
+                    <p class="text-zinc-600 dark:text-zinc-400 mb-2 leading-relaxed">
+                        No administrator account found in the database. Run this command in your terminal to initialize credentials:
+                    </p>
+                    <code class="block p-2.5 rounded-xl bg-zinc-950 text-amber-400 font-mono text-[11px] select-all break-all border border-zinc-800">
+                        python run.py --create admin --username "admin" --password "VeryStrongPassword123!"
+                    </code>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex items-center gap-2.5 mb-2.5">
+                        <img src="/static/assets/logo_inverted.png" alt="JVault" class="w-8 h-8 jvault-logo-img">
+                        <span class="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">JVault</span>
+                    </div>
+                    <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Sign In to JVault</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Authenticate to access your local crypto treasury and payment gateway.</p>
+                </div>
+
+                <form id="login-form" class="space-y-4" onsubmit="event.preventDefault(); Auth.handleLogin(); return false;">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Username</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400 pointer-events-none">
+                                <i class="ph ph-user text-lg"></i>
+                            </span>
+                            <input type="text" id="login-username" required class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all" placeholder="Enter username">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Master Password</label>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400 pointer-events-none">
+                                <i class="ph ph-lock-key text-lg"></i>
+                            </span>
+                            <input type="password" id="login-password" required class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all" placeholder="Enter password">
+                            <button type="button" onclick="const p = document.getElementById('login-password'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                                <i class="ph ph-eye text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="login-submit-btn" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all">
+                        <span>Sign In to JVault</span>
+                        <i class="ph ph-arrow-right text-lg"></i>
+                    </button>
+                </form>
+
+                <!-- Login Footer: Powered by JVault -->
+                <div class="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-center text-xs text-zinc-400">
+                    Powered by <a href="https://github.com/thejulan/jvault" target="_blank" rel="noopener noreferrer" class="font-semibold text-indigo-500 hover:text-indigo-400 hover:underline transition-colors">JVault</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== VIEW 2: MAIN DASHBOARD SPA ==================== -->
+    <div id="view-dashboard" class="hidden min-h-screen flex flex-col">
+        <!-- Top Navbar -->
+        <header class="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 flex-nowrap">
+                <!-- Brand & Status -->
+                <div class="flex items-center gap-4 sm:gap-6 shrink-0 flex-nowrap whitespace-nowrap">
+                    <div class="flex items-center gap-2.5 cursor-pointer shrink-0" onclick="App.switchTab('overview')">
+                        <img src="/static/assets/logo_inverted.png" alt="JVault Logo" class="w-8 h-8 jvault-logo-img">
+                        <span class="font-extrabold text-lg tracking-tight">JVault</span>
+                    </div>
+
+                    <!-- Navigation Tabs -->
+                    <nav class="hidden md:flex items-center gap-1 border-l border-zinc-200 dark:border-zinc-800 pl-4 sm:pl-6 shrink-0 flex-nowrap whitespace-nowrap">
+                        <button onclick="App.switchTab('overview')" class="app-nav-tab nav-tab-active flex items-center gap-2 py-3 px-3 text-sm font-bold text-zinc-900 dark:text-zinc-100 transition-colors shrink-0 whitespace-nowrap" data-tab="overview">
+                            <i class="ph ph-squares-four text-lg"></i>
+                            <span>Overview</span>
+                        </button>
+                        <button onclick="App.switchTab('wallets')" class="app-nav-tab flex items-center gap-2 py-3 px-3 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors shrink-0 whitespace-nowrap" data-tab="wallets">
+                            <i class="ph ph-wallet text-lg"></i>
+                            <span>Wallets</span>
+                        </button>
+                        <button onclick="App.switchTab('payments')" class="app-nav-tab flex items-center gap-2 py-3 px-3 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors shrink-0 whitespace-nowrap" data-tab="payments">
+                            <i class="ph ph-receipt text-lg"></i>
+                            <span>Payments</span>
+                        </button>
+                        <button onclick="App.switchTab('settings')" class="app-nav-tab flex items-center gap-2 py-3 px-3 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors shrink-0 whitespace-nowrap" data-tab="settings">
+                            <i class="ph ph-gear text-lg"></i>
+                            <span>Settings</span>
+                        </button>
+
+                        <!-- API Docs Hover Dropdown -->
+                        <div class="relative dropdown-container group/apidocs shrink-0 whitespace-nowrap">
+                            <button type="button" onclick="UI.toggleDropdown('dropdown-api-docs')" class="flex items-center gap-1.5 py-3 px-3 text-sm font-medium text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 transition-colors cursor-pointer shrink-0 whitespace-nowrap">
+                                <i class="ph ph-book-open text-lg"></i>
+                                <span class="whitespace-nowrap">API Docs</span>
+                                <i class="ph ph-caret-down text-xs opacity-70 transition-transform group-hover/apidocs:rotate-180"></i>
+                            </button>
+                            <div id="dropdown-api-docs" class="dropdown-menu hidden group-hover/apidocs:block absolute left-0 top-full mt-0.5 w-48 rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border border-zinc-200 dark:border-zinc-800 p-1.5 z-50 backdrop-blur-md">
+                                <a href="/docs" target="_blank" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors">
+                                    <i class="ph ph-code text-base text-indigo-500"></i>
+                                    <div>
+                                        <span class="font-bold block">Swagger Doc</span>
+                                        <span class="text-[10px] text-zinc-400 block -mt-0.5">Interactive OpenAPI</span>
+                                    </div>
+                                </a>
+                                <a href="/redoc" target="_blank" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors">
+                                    <i class="ph ph-file-text text-base text-purple-500"></i>
+                                    <div>
+                                        <span class="font-bold block">ReDoc</span>
+                                        <span class="text-[10px] text-zinc-400 block -mt-0.5">Clean API Spec</span>
+                                    </div>
+                                </a>
+                                <button type="button" onclick="Toast.info('DevDoc portal coming soon!')" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors text-left cursor-pointer">
+                                    <i class="ph ph-terminal-window text-base text-amber-500"></i>
+                                    <div>
+                                        <span class="font-bold block">DevDoc</span>
+                                        <span class="text-[10px] text-zinc-400 block -mt-0.5">SDK & Guides</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <!-- Right Actions: Install PWA + Fast Receive + Eye + Theme + Notifications + Profile (Strictly 1 line) -->
+                <div class="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-nowrap whitespace-nowrap">
+                    <!-- Install App: Icon-only, expands text smoothly on hover -->
+                    <button id="btn-install-pwa" onclick="App.promptPwaInstall()" class="hidden group/pwa h-9 px-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 font-semibold text-xs items-center border border-indigo-500/20 transition-all duration-300 cursor-pointer overflow-hidden whitespace-nowrap shrink-0">
+                        <i class="ph-bold ph-download-simple text-base shrink-0"></i>
+                        <span class="max-w-0 opacity-0 overflow-hidden group-hover/pwa:max-w-[90px] group-hover/pwa:opacity-100 group-hover/pwa:ml-1.5 transition-all duration-300 text-xs font-semibold whitespace-nowrap">Install App</span>
+                    </button>
+
+                    <button onclick="FastReceive.openModal()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/25 transition-all shrink-0">
+                        <i class="ph-fill ph-lightning text-amber-300 text-base shrink-0"></i>
+                        <span class="hidden sm:inline">Fast Receive</span>
+                    </button>
+
+                    <button id="btn-toggle-global-balances" onclick="Wallets.toggleHideBalances()" class="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" data-tooltip="Toggle Balances Visibility">
+                        <i class="balance-eye-icon ph ph-eye text-lg"></i>
+                    </button>
+
+                    <button onclick="Theme.toggle()" class="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" data-tooltip="Switch Theme">
+                        <i id="theme-toggle-icon" class="ph ph-sun text-lg text-amber-400"></i>
+                    </button>
+
+                    <div class="relative dropdown-container">
+                        <button onclick="UI.toggleDropdown('dropdown-notifications')" class="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors relative" data-tooltip="Notifications">
+                            <i class="ph ph-bell text-lg"></i>
+                            <span id="notif-badge" class="absolute top-1.5 right-1.5 w-4 h-4 bg-indigo-600 text-[10px] font-bold text-white rounded-full flex items-center justify-center">2</span>
+                        </button>
+                        <div id="dropdown-notifications" class="dropdown-menu hidden absolute right-0 mt-2 w-84 sm:w-96 rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border border-zinc-200 dark:border-zinc-800 p-2 z-50">
+                            <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-100 dark:border-zinc-800">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-xs uppercase tracking-wider text-zinc-400">Notifications</span>
+                                    <span id="notif-unread-count-pill" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500">0 unread</span>
+                                </div>
+                                <button onclick="App.markAllNotificationsRead()" class="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer">Read All</button>
+                            </div>
+                            <div id="notif-list" class="max-h-80 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800/60 no-scrollbar"></div>
+                        </div>
+                    </div>
+
+                    <div class="relative dropdown-container">
+                        <button onclick="UI.toggleDropdown('dropdown-profile')" class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs border border-indigo-500/20">
+                                <i class="ph-bold ph-user-circle text-xl"></i>
+                            </div>
+                            <span id="nav-user-name" class="hidden sm:inline font-semibold text-xs">admin</span>
+                            <i class="ph ph-caret-down text-xs text-zinc-400"></i>
+                        </button>
+                        <div id="dropdown-profile" class="dropdown-menu hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border border-zinc-200 dark:border-zinc-800 p-1.5 z-50">
+                            <div class="px-3 py-2 text-xs border-b border-zinc-100 dark:border-zinc-800 mb-1">
+                                <div class="font-bold text-zinc-900 dark:text-zinc-100">Administrator</div>
+                                <div class="text-[11px] text-zinc-400">Production Mode Active</div>
+                            </div>
+                            <button onclick="App.switchTab('settings')" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                                <i class="ph ph-gear text-base"></i> Settings & Telegram
+                            </button>
+                            <a href="/docs" target="_blank" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                                <i class="ph ph-book-open text-base"></i> API Docs (Swagger)
+                            </a>
+                            <button onclick="Wallets.openCreateModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                                <i class="ph ph-plus-circle text-base"></i> New Master Wallet
+                            </button>
+                            <div class="border-t border-zinc-100 dark:border-zinc-800 my-1"></div>
+                            <button onclick="Auth.logout()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 font-semibold">
+                                <i class="ph ph-sign-out text-base"></i> Lock / Sign Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- ================= TAB 1: OVERVIEW ================= -->
+            <section id="tab-overview" class="tab-pane space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+                        <div class="flex items-center justify-between text-zinc-400 mb-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider">Total Balance</span>
+                            <i class="ph ph-vault text-xl text-indigo-500"></i>
+                        </div>
+                        <div id="stat-total-treasury" class="text-2xl font-extrabold font-mono text-zinc-900 dark:text-zinc-50 tracking-tight">$0.00</div>
+                        <div id="stat-treasury-sub" class="text-[11px] text-zinc-400 font-mono mt-0.5 hidden"></div>
+                        <span class="text-[11px] text-emerald-500 font-medium flex items-center gap-1 mt-2">
+                            <i class="ph ph-shield-check"></i> Non-custodial storage
+                        </span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                        <div class="flex items-center justify-between text-zinc-400 mb-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider">Confirmed Volume</span>
+                            <i class="ph ph-chart-line-up text-xl text-emerald-500"></i>
+                        </div>
+                        <div id="stat-total-vol" class="text-2xl font-extrabold font-mono text-zinc-900 dark:text-zinc-50 tracking-tight">$0.00</div>
+                        <span class="text-[11px] text-zinc-400 font-medium mt-2 block">Settled on-chain</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                        <div class="flex items-center justify-between text-zinc-400 mb-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider">Pending Invoices</span>
+                            <i class="ph ph-clock-countdown text-xl text-amber-500"></i>
+                        </div>
+                        <div id="stat-pending-count" class="text-2xl font-extrabold font-mono text-zinc-900 dark:text-zinc-50 tracking-tight">0</div>
+                        <span class="text-[11px] text-amber-500 font-medium mt-2 block">Validator scanning mempools</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                        <div class="flex items-center justify-between text-zinc-400 mb-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider">Active Wallets</span>
+                            <i class="ph ph-wallet text-xl text-purple-500"></i>
+                        </div>
+                        <div id="stat-wallets-count" class="text-2xl font-extrabold font-mono text-zinc-900 dark:text-zinc-50 tracking-tight">0</div>
+                        <span id="stat-networks-derived" class="text-[11px] text-zinc-400 font-medium mt-2 block">0 Networks Derived</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div onclick="FastReceive.openModal()" class="cursor-pointer p-6 rounded-2xl bg-gradient-to-br from-indigo-900 to-indigo-950 text-white border border-indigo-800/80 hover:border-indigo-700 shadow-md hover:scale-[1.01] transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl mb-4">
+                            <i class="ph-fill ph-lightning"></i>
+                        </div>
+                        <h4 class="font-bold text-base mb-1">Fast Universal Receive</h4>
+                        <p class="text-xs text-indigo-200/70 mb-4">Create a universal payment link. Client chooses token and network on checkout.</p>
+                        <span class="text-xs font-bold text-indigo-300 flex items-center gap-1">Generate Link <i class="ph ph-arrow-right"></i></span>
+                    </div>
+
+                    <div onclick="Wallets.openCreateModal()" class="cursor-pointer p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm hover:scale-[1.01] transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl mb-4">
+                            <i class="ph-bold ph-plus-circle"></i>
+                        </div>
+                        <h4 class="font-bold text-base text-zinc-900 dark:text-zinc-100 mb-1">New Multi-Chain Wallet</h4>
+                        <p class="text-xs text-zinc-500 mb-4">Generate 12/24-word BIP39 seed phrase with local AES encryption.</p>
+                        <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">Create Wallet <i class="ph ph-arrow-right"></i></span>
+                    </div>
+
+                    <div onclick="App.switchTab('settings')" class="cursor-pointer p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm hover:scale-[1.01] transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center text-xl mb-4">
+                            <i class="ph-bold ph-telegram-logo"></i>
+                        </div>
+                        <h4 class="font-bold text-base text-zinc-900 dark:text-zinc-100 mb-1">Telegram Bot Settings</h4>
+                        <p class="text-xs text-zinc-500 mb-4">Configure Telethon credentials to enable auto-updating payment messages.</p>
+                        <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">Bot Settings <i class="ph ph-arrow-right"></i></span>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Recent Payment Activity</h3>
+                            <p class="text-xs text-zinc-400">Live invoices verified on-chain by the background payment validator.</p>
+                        </div>
+                        <button onclick="App.switchTab('payments')" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                            View All Invoices &rarr;
+                        </button>
+                    </div>
+                    <div id="overview-recent-payments" class="divide-y divide-zinc-100 dark:divide-zinc-800/80"></div>
+                </div>
+            </section>
+
+            <!-- ================= TAB 2: WALLETS ================= -->
+            <section id="tab-wallets" class="tab-pane hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Crypto Wallets</h2>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Multi-network HD wallets stored locally with AES-256 GCM encryption. No third-party custody.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="Wallets.openWithdrawModal()" class="px-4 py-2 rounded-xl bg-zinc-200/90 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all">
+                            <i class="ph ph-paper-plane-tilt text-base text-indigo-500"></i>
+                            <span>Send / Withdraw</span>
+                        </button>
+                        <button onclick="Wallets.openCreateModal()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-sm transition-colors">
+                            <i class="ph ph-plus-circle text-base"></i>
+                            <span>Generate Wallet</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="wallets-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div id="wallets-pagination" class="hidden flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-zinc-200 dark:border-zinc-800"></div>
+            </section>
+
+            <!-- ================= TAB 2B: DEDICATED ADDRESSES PAGE (NOT A MODAL!) ================= -->
+            <section id="tab-addresses" class="tab-pane hidden space-y-6">
+                <!-- Page Header with Back Button & On-Chain Refresher -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+                    <div class="flex items-center gap-3">
+                        <button onclick="App.switchTab('wallets')" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors" data-tooltip="Back to Wallets">
+                            <i class="ph ph-arrow-left text-lg"></i>
+                        </button>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 id="addr-page-wallet-name" class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Wallet Addresses</h2>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">Master Keystore</span>
+                            </div>
+                            <div class="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
+                                <span>Total Balance: <strong id="addr-page-wallet-balance" class="font-mono text-zinc-700 dark:text-zinc-200">$0.00</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2.5">
+                        <button onclick="Wallets.openGenerateAddressModal()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-sm shadow-indigo-500/25 transition-all">
+                            <i class="ph ph-plus-circle text-base"></i>
+                            <span>Generate New Address</span>
+                        </button>
+                        <button id="btn-refresh-balances" onclick="Wallets.refreshAllOnChainBalances()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all">
+                            <i class="ph ph-arrows-clockwise text-base"></i>
+                            <span>Refresh Balances</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters Bar (Copied Payments UI style, filters on left, 1st category colored) -->
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- 1st Category: Status Filters (Segmented container with colored active tabs) -->
+                        <div id="address-status-filters" class="flex items-center p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60">
+                            <button onclick="Wallets.filterAddressesByStatus('ALL')" data-status="ALL" class="addr-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
+                                <i class="ph ph-stack text-xs"></i> All Status
+                            </button>
+                            <button onclick="Wallets.filterAddressesByStatus('ACTIVE')" data-status="ACTIVE" class="addr-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer">
+                                <i class="ph-fill ph-check-circle text-xs text-emerald-500"></i> Active
+                            </button>
+                            <button onclick="Wallets.filterAddressesByStatus('INACTIVE')" data-status="INACTIVE" class="addr-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer">
+                                <i class="ph ph-pause-circle text-xs text-zinc-400"></i> Inactive
+                            </button>
+                            <button onclick="Wallets.filterAddressesByStatus('EXPIRED')" data-status="EXPIRED" class="addr-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer">
+                                <i class="ph ph-timer text-xs text-rose-500"></i> Expired
+                            </button>
+                        </div>
+
+                        <!-- 2nd Category: Network Chains Filter -->
+                        <div id="address-network-filters" class="flex flex-wrap items-center gap-1">
+                            <button onclick="Wallets.filterAddressesByNetwork('ALL')" data-net="ALL" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 transition-all cursor-pointer">All Chains</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('bitcoin')" data-net="bitcoin" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">BTC</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('ethereum')" data-net="ethereum" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">ETH</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('litecoin')" data-net="litecoin" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">LTC</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('dogecoin')" data-net="dogecoin" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">DOGE</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('tron')" data-net="tron" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">TRX</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('solana')" data-net="solana" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">SOL</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('bsc')" data-net="bsc" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">BSC</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('polygon')" data-net="polygon" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">Polygon</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('arbitrum')" data-net="arbitrum" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">Arbitrum</button>
+                            <button onclick="Wallets.filterAddressesByNetwork('ton')" data-net="ton" class="addr-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer">TON</button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Refresh addresses button -->
+                    <button onclick="Wallets.loadAddressesData(false)" class="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0" data-tooltip="Refresh Addresses">
+                        <i class="ph ph-arrows-clockwise text-base"></i>
+                    </button>
+                </div>
+
+                <!-- Address Cards Grid -->
+                <div id="addresses-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+                <!-- Address Pagination -->
+                <div id="addresses-pagination" class="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-800"></div>
+            </section>
+
+            <!-- ================= TAB 3: PAYMENTS ================= -->
+            <section id="tab-payments" class="tab-pane hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Payment Invoices & Sent Withdrawals</h2>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Real-time settlement tracking for incoming invoices and outgoing multi-chain transfers.</p>
+                    </div>
+                </div>
+
+                <!-- Filters Bar -->
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Direction Selector -->
+                        <div class="flex items-center p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60">
+                            <button onclick="Payments.setDirection('ALL')" data-dir="ALL" class="payment-dir-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm transition-all flex items-center gap-1.5">
+                                <i class="ph ph-arrows-left-right text-xs"></i> All Activity
+                            </button>
+                            <button onclick="Payments.setDirection('INCOMING')" data-dir="INCOMING" class="payment-dir-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-1.5">
+                                <i class="ph ph-arrow-down-left text-xs text-emerald-500"></i> Received
+                            </button>
+                            <button onclick="Payments.setDirection('OUTGOING')" data-dir="OUTGOING" class="payment-dir-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-1.5">
+                                <i class="ph-bold ph-paper-plane-tilt text-xs text-purple-500"></i> Sent Transfers
+                            </button>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="flex flex-wrap items-center gap-1">
+                            <button onclick="Payments.setFilter('ALL')" data-status="ALL" class="payment-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 transition-all">All</button>
+                            <button onclick="Payments.setFilter('PENDING')" data-status="PENDING" class="payment-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">Pending</button>
+                            <button onclick="Payments.setFilter('CONFIRMING')" data-status="CONFIRMING" class="payment-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">Confirming</button>
+                            <button onclick="Payments.setFilter('PAID')" data-status="PAID" class="payment-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">Completed</button>
+                            <button onclick="Payments.setFilter('EXPIRED')" data-status="EXPIRED" class="payment-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">Expired</button>
+                        </div>
+                    </div>
+
+                    <button onclick="Payments.loadPayments(true)" class="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" data-tooltip="Refresh Transactions">
+                        <i class="ph ph-arrows-clockwise text-base"></i>
+                    </button>
+                </div>
+
+                <!-- Payments Table Container -->
+                <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-400 text-[11px] font-bold uppercase tracking-wider">
+                                    <th class="py-3 px-4">Type</th>
+                                    <th class="py-3 px-4">Transaction ID</th>
+                                    <th class="py-3 px-4">Asset / Amount</th>
+                                    <th class="py-3 px-4">Network & Fee</th>
+                                    <th class="py-3 px-4">Address / Destination</th>
+                                    <th class="py-3 px-4">Status & Details</th>
+                                    <th class="py-3 px-4">Created</th>
+                                    <th class="py-3 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payments-table-body" class="divide-y divide-zinc-100 dark:divide-zinc-800/80 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div id="payments-empty-state" class="hidden p-12 text-center text-zinc-400">
+                        <i class="ph ph-receipt text-3xl mb-2"></i>
+                        <p class="text-sm">No transactions found for this filter.</p>
+                    </div>
+                </div>
+                <div id="payments-pagination" class="hidden flex flex-col sm:flex-row items-center justify-between gap-4 pt-4"></div>
+            </section>
+
+            <!-- ================= TAB 4: SETTINGS ================= -->
+            <section id="tab-settings" class="tab-pane hidden space-y-8">
+                <div>
+                    <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Gateway Settings & Bot Configuration</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Configure Telethon Telegram bot credentials, public base URLs, and export backup keys.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    <!-- Left Column: General Gateway Settings & Developer Tools -->
+                    <div class="space-y-6">
+                        <!-- Card 1: General Gateway Settings -->
+                        <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-xl">
+                                    <i class="ph ph-sliders"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">General Gateway Settings</h3>
+                                    <span class="text-xs text-zinc-400">Domain routing & currency conversion</span>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Public Base URL / Domain (Replaces 127.0.0.1)</label>
+                                        <div class="flex items-center gap-1.5">
+                                            <button type="button" onclick="Settings.useCurrentHost()" class="text-[10px] text-indigo-500 hover:underline font-semibold">Use Current Host</button>
+                                            <span class="text-zinc-400 text-[10px]">&bull;</span>
+                                            <button type="button" onclick="Settings.resetToLocalhost()" class="text-[10px] text-zinc-400 hover:underline">127.0.0.1</button>
+                                        </div>
+                                    </div>
+                                    <input type="text" id="set-public-url" oninput="Settings.updateUrlPreview()" placeholder="e.g. https://payments.example.com or pay.mydomain.com" class="w-full px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                    <div class="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-[11px] mt-1.5 space-y-1">
+                                        <div class="text-zinc-500 dark:text-zinc-400">All copied checkout & Telegram links will automatically use:</div>
+                                        <div id="settings-url-preview" class="font-mono text-xs text-indigo-500 font-bold truncate select-all">https://payments.example.com/pay/PAY-A1B2C3D4</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Balance Base / Display Currency</label>
+                                    <div id="set-currency-select-container"></div>
+                                    <p class="text-[11px] text-zinc-400 mt-1">Converts Total Balance balance on dashboard using live rates (auto-refreshes).</p>
+                                </div>
+                                <div class="flex items-center justify-between pt-2 hidden">
+                                    <div>
+                                        <div class="font-semibold text-xs text-zinc-900 dark:text-zinc-100">Simulation Mode</div>
+                                        <div class="text-[11px] text-zinc-400">Allows manual/simulated payment confirmations for testing.</div>
+                                    </div>
+                                    <input type="checkbox" id="set-simulation-mode" class="w-4 h-4 text-indigo-600 rounded">
+                                </div>
+                                <button onclick="Settings.saveGeneralSettings()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-colors">
+                                    Save General Settings
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Interactive API Documentation & Developer Tools -->
+                        <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl">
+                                    <i class="ph ph-code"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">API Documentation</h3>
+                                    <span class="text-xs text-zinc-400">FastAPI OpenAPI 3.0 & Swagger UI</span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4 leading-relaxed">
+                                Complete REST documentation for invoices, multi-chain derivations, balance checking, and Telegram integrations.
+                            </p>
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <a href="/docs" target="_blank" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all">
+                                    <i class="ph ph-arrow-square-out text-base"></i>
+                                    <span>Swagger UI (/docs)</span>
+                                </a>
+                                <a href="/redoc" target="_blank" class="px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-all">
+                                    <i class="ph ph-book-open text-base"></i>
+                                    <span>ReDoc (/redoc)</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Telethon Bot & Balance Backup -->
+                    <div class="space-y-6">
+                        <!-- Card 3: Telegram Bot (Telethon) Config Card -->
+                        <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center text-xl">
+                                        <i class="ph-fill ph-telegram-logo"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">Telegram Bot</h3>
+                                        <span class="text-xs text-zinc-400">Live Invoice Auto-Updater</span>
+                                    </div>
+                                </div>
+                                <span id="tg-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-400">Checking...</span>
+                            </div>
+
+                            <div class="space-y-3.5">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Telegram API ID</label>
+                                        <button type="button" onclick="Settings.openHowToGetModal('api_id')" class="text-[11px] font-semibold text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1">
+                                            <i class="ph ph-question text-xs"></i> how to get?
+                                        </button>
+                                    </div>
+                                    <input type="text" id="tg-api-id" placeholder="e.g. 1234567" class="w-full px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                </div>
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Telegram API Hash</label>
+                                        <button type="button" onclick="Settings.openHowToGetModal('api_hash')" class="text-[11px] font-semibold text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1">
+                                            <i class="ph ph-question text-xs"></i> how to get?
+                                        </button>
+                                    </div>
+                                    <input type="password" id="tg-api-hash" placeholder="e.g. 0123456789abcdef0123456789abcdef" class="w-full px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                </div>
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Bot Token</label>
+                                        <button type="button" onclick="Settings.openHowToGetModal('bot_token')" class="text-[11px] font-semibold text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1">
+                                            <i class="ph ph-question text-xs"></i> how to get?
+                                        </button>
+                                    </div>
+                                    <input type="password" id="tg-bot-token" placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz" class="w-full px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Bot Username</label>
+                                    <input type="text" id="tg-bot-username" placeholder="e.g. JVaultPayBot" class="w-full px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                </div>
+
+                                <div class="flex items-center gap-3 pt-1">
+                                    <button onclick="Settings.saveTelegramConfig()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer">
+                                        Save & Restart Bot
+                                    </button>
+                                    <button id="tg-toggle-btn" onclick="Settings.toggleTelegramBot()" class="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition-colors cursor-pointer">
+                                        Toggle Bot
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Backup & Restore -->
+                        <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl">
+                                    <i class="ph-bold ph-shield-check"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">Backup & Restore</h3>
+                                    <span class="text-xs text-zinc-400">Encrypted .jvault keystore snapshot</span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4 leading-relaxed">
+                                Create an encrypted snapshot of all wallets, addresses, payments, and settings protected with a 6-character PIN, or restore data from an existing <code>.jvault</code> file.
+                            </p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <button type="button" onclick="Settings.openBackupModal()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
+                                    <i class="ph-bold ph-download-simple text-base"></i>
+                                    <span>Backup</span>
+                                </button>
+                                <button type="button" onclick="Settings.openRestoreModal()" class="w-full py-2.5 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                    <i class="ph-bold ph-upload-simple text-base"></i>
+                                    <span>Restore</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 5: Danger Zone (Self Destroy Data) -->
+                        <div class="p-6 rounded-2xl bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/30 shadow-sm relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center text-xl">
+                                        <i class="ph-bold ph-skull"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-sm text-rose-600 dark:text-rose-400">Danger Zone</h3>
+                                        <span class="text-xs text-rose-500/70">Emergency data purge</span>
+                                    </div>
+                                </div>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/15 text-rose-500 border border-rose-500/30 tracking-wider">
+                                    Irreversible
+                                </span>
+                            </div>
+                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
+                                Permanently wipe all cryptocurrency treasury wallets, private keys, payment history, and gateway records. This operation is immediate, complete, and cannot be undone.
+                            </p>
+                            <button type="button" onclick="Settings.openSelfDestroyModal()" class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-md shadow-rose-600/25 transition-all cursor-pointer">
+                                <i class="ph-bold ph-trash-simple text-base"></i>
+                                <span>Self Destroy All Data</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Dashboard Footer -->
+        <footer class="mt-auto border-t border-zinc-200/80 dark:border-zinc-800/80 py-4 px-6 sm:px-8 bg-white/40 dark:bg-zinc-900/40 backdrop-blur-sm">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                <div class="flex items-center gap-2">
+                    <img src="/static/assets/logo_inverted.png" alt="JVault" class="w-4 h-4 jvault-logo-img">
+                    <span>JVault Gateway &bull; Self-Custodial Multi-Chain Infrastructure</span>
+                </div>
+                <div>
+                    Powered by <a href="https://github.com/thejulan/jvault" target="_blank" rel="noopener noreferrer" class="font-semibold text-indigo-500 hover:text-indigo-400 hover:underline transition-colors">JVault</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- MODAL 1: Fast Receive (Blind Payment Universal Link Generator) -->
+    <div id="modal-fast-receive" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph-fill ph-lightning text-amber-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Fast Receive Link</h3>
+                        <p class="text-xs text-zinc-400">Client will choose crypto token and network on checkout</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-fast-receive')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <!-- Form Step -->
+                <div id="fast-receive-step-create" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Destination Balance Wallet</label>
+                        <div id="fast-wallet-select-container"></div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Destination Address</label>
+                            <button type="button" onclick="FastReceive.openCreateAddressModal()" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1">
+                                <i class="ph ph-plus-circle text-sm"></i>
+                                <span>Create New Address</span>
+                            </button>
+                        </div>
+                        <div id="fast-address-select-container"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Amount in USD (Optional - Leave blank for open amount)</label>
+                        <input type="number" min="0" step="any" id="fast-amount-input" placeholder="0.00 (Open amount)" class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm font-mono">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Address Lifespan (Static / Temporary)</label>
+                        <div id="fast-lifespan-container"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Order Reference / Description</label>
+                        <input type="text" id="fast-desc-input" placeholder="e.g. Invoice #2049" class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm">
+                    </div>
+                </div>
+
+                <!-- Links Only Output Screen -->
+                <div id="fast-receive-step-result" class="hidden space-y-5">
+                    <div class="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-500/20 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-indigo-500 tracking-wider">Universal Invoice ID</span>
+                            <div id="res-pay-id" class="font-mono font-extrabold text-sm text-zinc-900 dark:text-zinc-100">PAY-XXXX</div>
+                        </div>
+                        <div id="res-pay-amount" class="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300"></div>
+                    </div>
+
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        Share either of these links with your client. They will choose their cryptocurrency (USDT, BTC, ETH, SOL, TRX, etc.) and blockchain network when opening the link:
+                    </p>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-zinc-500 mb-1">Web Checkout Link</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="res-pay-web-link" readonly class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                <button onclick="FastReceive.copyField('res-pay-web-link', 'Web Link')" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0" data-tooltip="Copy Web Link">
+                                    <i class="ph ph-copy text-base"></i>
+                                </button>
+                                <a id="btn-open-web-link" target="_blank" class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 shrink-0" data-tooltip="Open Checkout">
+                                    <i class="ph ph-arrow-square-out text-base"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-zinc-500 mb-1">Telegram Deep Link (https://t.me/BOT?start=PAYID)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="res-pay-tg-link" readonly class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                                <button onclick="FastReceive.copyField('res-pay-tg-link', 'Telegram Link')" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0" data-tooltip="Copy Telegram Link">
+                                    <i class="ph ph-copy text-base"></i>
+                                </button>
+                                <a id="btn-open-tg-link" target="_blank" class="p-2 rounded-xl bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 shrink-0" data-tooltip="Open in Telegram">
+                                    <i class="ph ph-telegram-logo text-base"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Footer with Generate & Cancel buttons -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800">
+                <div id="fast-receive-footer-create" class="flex items-center justify-end gap-3 w-full">
+                    <button type="button" onclick="UI.closeModal('modal-fast-receive')" class="px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-generate-fast-receive" onclick="FastReceive.submitPayment()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-indigo-500/25 transition-all">
+                        <i class="ph ph-lightning text-base"></i>
+                        <span>Generate Universal Payment Link</span>
+                    </button>
+                </div>
+                <div id="fast-receive-footer-result" class="hidden flex items-center justify-end gap-3 w-full">
+                    <button type="button" onclick="UI.closeModal('modal-fast-receive')" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1B: Cinematic Spotlight Card Modal -->
+    <div id="modal-wallet-cinematic" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto no-scrollbar">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 dark:bg-black/85 backdrop-blur-md transition-opacity" onclick="UI.closeModal('modal-wallet-cinematic')"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden no-scrollbar z-10">
+            <!-- Header with Close -->
+            <div class="p-5 sm:px-8 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between bg-white/95 dark:bg-zinc-950/95 sticky top-0 z-30">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
+                        <i class="ph-bold ph-shield-check text-base"></i>
+                    </div>
+                    <div>
+                        <h3 id="cinematic-wallet-name" class="font-bold text-sm text-zinc-900 dark:text-zinc-100">JVault Balance Vault</h3>
+                        <span class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 block -mt-0.5">Hardware-Grade Isolated Keystore</span>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-wallet-cinematic')" class="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Body with Hero Card & Activity Logs -->
+            <div class="modal-body flex-1 overflow-y-auto p-5 sm:px-8 space-y-6 no-scrollbar">
+                <!-- Centered Hero Credit Card -->
+                <div class="card-perspective-container py-3">
+                    <div id="cinematic-hero-card" class="hero-credit-card max-w-md mx-auto p-7 text-white border relative flex flex-col justify-between min-h-[240px]">
+                        <!-- Dynamic specular ambient glow -->
+                        <div id="cinematic-hero-glow" class="absolute -right-10 -top-10 w-52 h-52 rounded-full blur-3xl pointer-events-none opacity-40"></div>
+                        <div class="card-hover-glow"></div>
+
+                        <div class="flex items-center justify-between relative z-10">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                                    <i class="ph ph-vault text-lg"></i>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-extrabold tracking-widest uppercase text-white">JVAULT</span>
+                                    <span class="text-[9px] uppercase tracking-wider text-indigo-300 block -mt-0.5">COLD TREASURY</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span id="cinematic-default-badge" class="hidden px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">DEFAULT</span>
+                                <span id="cinematic-pinned-badge" class="hidden px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1"><i class="ph-fill ph-push-pin text-[9px]"></i> PINNED</span>
+                                <svg class="w-5 h-5 text-zinc-400 ml-1 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8.5 16.5a5 5 0 0 1 0-7"/><path d="M12 19a8.5 8.5 0 0 0 0-14"/><path d="M15.5 21.5a12 12 0 0 0 0-19"/></svg>
+                            </div>
+                        </div>
+
+                        <!-- EMV Chip & Number -->
+                        <div class="my-5 flex items-center justify-between relative z-10">
+                            <div class="emv-chip">
+                                <div class="emv-chip-lines"></div>
+                            </div>
+                            <div id="cinematic-card-id" class="font-mono text-sm tracking-widest text-zinc-300 card-embossed font-bold">
+                                •••• &nbsp; •••• &nbsp; •••• &nbsp; <span class="text-white">0000</span>
+                            </div>
+                        </div>
+
+                        <!-- Cardholder & Balance -->
+                        <div class="relative z-10 pt-3 border-t border-white/10 flex items-end justify-between">
+                            <div>
+                                <span class="text-[9px] uppercase font-bold tracking-widest text-zinc-400 block">CARDHOLDER / VAULT</span>
+                                <span id="cinematic-card-label" class="text-sm font-bold uppercase tracking-wider text-white card-label-embossed block">MASTER VAULT</span>
+                                <span id="cinematic-card-chains" class="text-[9px] font-mono text-zinc-300 block mt-0.5">10 CHAINS DERIVED</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[9px] uppercase font-bold tracking-widest text-zinc-400 block">SETTLED TREASURY</span>
+                                <div id="cinematic-card-balance" class="text-xl font-extrabold font-mono text-white tracking-tight card-embossed">$0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Action Buttons -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <button id="cinematic-btn-addresses" class="py-2.5 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                        <i class="ph ph-identification-card text-indigo-500 dark:text-indigo-400 text-base"></i>
+                        <span>Dedicated Addresses</span>
+                    </button>
+                    <button id="cinematic-btn-send" class="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/25 transition-all">
+                        <i class="ph ph-paper-plane-tilt text-base"></i>
+                        <span>Send / Withdraw</span>
+                    </button>
+                    <button id="cinematic-btn-receive" class="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-500/25 transition-all">
+                        <i class="ph ph-arrow-down-left text-base"></i>
+                        <span>Fast Receive</span>
+                    </button>
+                </div>
+
+                <!-- Wallet Logs & Activity Stream -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Wallet Logs & Audit Stream</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400" id="cinematic-log-count">Live</span>
+                    </div>
+
+                    <div id="cinematic-wallet-logs-list" class="space-y-2 max-h-56 overflow-y-auto no-scrollbar font-mono text-xs divide-y divide-zinc-200 dark:divide-zinc-800/60">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Multi-Chain Active Addresses Mini List -->
+                <div class="space-y-3 pt-2">
+                    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Active Network Addresses</span>
+                        <span id="cinematic-addrs-count" class="text-[10px] font-mono text-indigo-500 dark:text-indigo-400">Loading...</span>
+                    </div>
+                    <div id="cinematic-addrs-list" class="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Create Wallet Wizard -->
+    <div id="modal-create-wallet" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-wallet"></i>
+                    </div>
+                    <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Generate Master Wallet</h3>
+                </div>
+                <button onclick="UI.closeModal('modal-create-wallet')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <div id="wallet-create-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Wallet Name</label>
+                        <input type="text" id="wallet-name-input" class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Words Count</label>
+                        <div id="wallet-words-count-container"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Or Import Existing Mnemonic Phrase (Optional)</label>
+                        <textarea id="wallet-mnemonic-input" rows="2" placeholder="Leave blank to generate fresh seed phrase..." class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono"></textarea>
+                    </div>
+
+                    <!-- Custom Checkbox: Auto-generate addresses -->
+                    <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between cursor-pointer select-none" onclick="const cb = document.getElementById('wallet-auto-generate-addresses'); cb.checked = !cb.checked;">
+                        <div class="pr-3">
+                            <div class="font-semibold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                <i class="ph-bold ph-check-square-offset text-indigo-500 text-sm"></i>
+                                <span>Auto-Generate Multi-Chain Addresses</span>
+                            </div>
+                            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Pre-derives public deposit addresses across all 10+ supported networks (BTC, ETH, SOL, TRON, TON, etc.)</div>
+                        </div>
+                        <input type="checkbox" id="wallet-auto-generate-addresses" checked class="w-4 h-4 text-indigo-600 rounded accent-indigo-600 shrink-0 cursor-pointer" onclick="event.stopPropagation()">
+                    </div>
+
+                    <button type="button" id="btn-submit-wallet" onclick="Wallets.submitCreateWallet()" class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all">
+                        <span>Generate Wallet</span>
+                        <i class="ph ph-sparkle text-base"></i>
+                    </button>
+                </div>
+
+                <div id="wallet-create-result" class="hidden space-y-4">
+                    <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-semibold flex items-center gap-2">
+                        <i class="ph ph-warning-diamond text-lg shrink-0"></i>
+                        <span>Write down these words on physical paper. Never share them with anyone!</span>
+                    </div>
+
+                    <div id="mnemonic-words-grid" class="grid grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800"></div>
+
+                </div>
+            </div>
+
+            <!-- Sticky Modal Footer for Generated Mnemonic Result -->
+            <div id="wallet-create-result-footer" class="hidden modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                <button type="button" id="btn-copy-mnemonic" class="flex-1 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                    <i class="ph ph-copy text-base"></i> Copy Phrase
+                </button>
+                <button type="button" onclick="UI.closeModal('modal-create-wallet')" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-500/20 transition-all cursor-pointer">
+                    I've Saved It
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2C: Edit Wallet -->
+    <div id="modal-edit-wallet" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-pencil-simple"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Edit Wallet</h3>
+                        <p class="text-xs text-zinc-400">Update wallet name and default treasury status</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-edit-wallet')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <input type="hidden" id="edit-wallet-id">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Wallet Name</label>
+                    <input type="text" id="edit-wallet-name" class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm">
+                </div>
+                <div class="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
+                    <div>
+                        <span class="font-semibold text-xs text-zinc-900 dark:text-zinc-100 block">Default Primary Balance</span>
+                        <span class="text-[11px] text-zinc-400">Fast invoices will use this wallet by default</span>
+                    </div>
+                    <input type="checkbox" id="edit-wallet-default" class="w-4 h-4 text-indigo-600 rounded">
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button type="button" onclick="UI.closeModal('modal-edit-wallet')" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-submit-edit-wallet" onclick="Wallets.submitEditWallet()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/25 transition-all">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2D: Delete Wallet Confirmation -->
+    <div id="modal-delete-wallet" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-trash"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Delete Wallet</h3>
+                        <p class="text-xs text-zinc-400">Permanently delete wallet and associated keys</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-delete-wallet')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <input type="hidden" id="delete-wallet-id">
+                <div class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs space-y-2">
+                    <div class="flex items-center gap-2 font-bold text-sm">
+                        <i class="ph-bold ph-warning text-base"></i>
+                        <span>Irreversible Action</span>
+                    </div>
+                    <p>
+                        Are you sure you want to permanently delete <strong id="delete-wallet-name" class="font-bold underline"></strong>?
+                    </p>
+                    <p class="text-[11px] opacity-90">
+                        This will permanently remove the encrypted master seed and all associated derived blockchain addresses and payment records. Ensure you have backed up any private keys or mnemonics!
+                    </p>
+                </div>
+
+                <!-- Confirmation Code Card (Anti-Copy, Unselectable) -->
+                <div class="p-3.5 rounded-2xl bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 text-center select-none" oncopy="return false;" oncut="return false;" oncontextmenu="return false;" style="user-select: none; -webkit-user-select: none;">
+                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block mb-1.5">Wallet Identifier Confirmation</span>
+                    <div class="font-mono text-base font-extrabold tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-center gap-2 select-none">
+                        <span class="text-zinc-400 select-none">&bull;&bull;&bull;&bull;</span>
+                        <span class="text-zinc-400 select-none">&bull;&bull;&bull;&bull;</span>
+                        <span id="delete-wallet-last4" class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold select-none">••••</span>
+                    </div>
+                </div>
+
+                <!-- Input to confirm: OTP Squares for LAST 4 -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 text-center">
+                        Type the <span id="delete-wallet-target-label" class="text-rose-500 font-extrabold underline underline-offset-2">LAST 4</span> characters of the identifier above to confirm:
+                    </label>
+                    <div id="delete-wallet-otp-container" class="flex items-center justify-center gap-2.5">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="0" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="1" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="2" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="3" autocomplete="off" inputmode="text">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button type="button" onclick="UI.closeModal('modal-delete-wallet')" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-submit-delete-wallet" disabled onclick="Wallets.submitDeleteWallet()" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-md shadow-rose-500/25 transition-all opacity-40 cursor-not-allowed">
+                    Delete Wallet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2E: Delete Address Confirmation -->
+    <div id="modal-delete-address" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-trash"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Delete Address</h3>
+                        <p class="text-xs text-zinc-400">Permanently remove blockchain address</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-delete-address')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <input type="hidden" id="delete-address-id">
+                <div class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs space-y-2">
+                    <div class="flex items-center gap-2 font-bold text-sm">
+                        <i class="ph-bold ph-warning text-base"></i>
+                        <span>Irreversible Action</span>
+                    </div>
+                    <p>
+                        Are you sure you want to delete this address?
+                    </p>
+                    <p class="text-[11px] opacity-90">
+                        This will remove the derived address from your dashboard. Any future incoming transactions will not be monitored unless regenerated.
+                    </p>
+                </div>
+
+                <!-- Confirmation Code Card (Anti-Copy, Unselectable) -->
+                <div class="p-3.5 rounded-2xl bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 text-center select-none" oncopy="return false;" oncut="return false;" oncontextmenu="return false;" style="user-select: none; -webkit-user-select: none;">
+                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block mb-1.5">Address Confirmation Code</span>
+                    <div class="font-mono text-base font-extrabold tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-center gap-2 select-none">
+                        <span class="text-zinc-400 select-none">&bull;&bull;&bull;&bull;</span>
+                        <span class="text-zinc-400 select-none">&bull;&bull;&bull;&bull;</span>
+                        <span id="delete-address-last4" class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold select-none">••••</span>
+                    </div>
+                </div>
+
+                <!-- Input to confirm: OTP Squares for LAST 4 -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 text-center">
+                        Type the <span id="delete-address-target-label" class="text-rose-500 font-extrabold underline underline-offset-2">LAST 4</span> characters of the identifier above to confirm:
+                    </label>
+                    <div id="delete-address-otp-container" class="flex items-center justify-center gap-2.5">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="0" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="1" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="2" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-12 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all shadow-sm" data-index="3" autocomplete="off" inputmode="text">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button type="button" onclick="UI.closeModal('modal-delete-address')" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-submit-delete-address" disabled onclick="Wallets.submitDeleteAddress()" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-md shadow-rose-500/25 transition-all opacity-40 cursor-not-allowed">
+                    Delete Address
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2B: Generate New Address for Wallet Modal -->
+    <div id="modal-generate-address" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-plus-circle text-indigo-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Generate New Address</h3>
+                        <p class="text-xs text-zinc-400">Select crypto token, then choose from available blockchain networks</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-generate-address')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">1. Select Crypto Token</label>
+                    <div id="modal-addr-token-container"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">2. Available Network Standard</label>
+                    <div id="modal-addr-derive-network-container"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">3. Disposal Time (Auto-deletes when expired)</label>
+                    <div id="modal-addr-duration-container"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">4. Custom Label (Optional)</label>
+                    <input type="text" id="modal-page-derive-label" placeholder="e.g. OTC Client, Invoice #102, or Cold Storage" class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm">
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                <button type="button" onclick="UI.closeModal('modal-generate-address')" class="flex-1 py-2.5 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-modal-derive-addr" onclick="Wallets.submitGenerateAddressModal()" class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/25 transition-all flex items-center justify-center gap-2">
+                    <i class="ph ph-plus-circle text-base"></i>
+                    <span>Generate Address</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Edit Address Label Modal -->
+    <div id="modal-edit-label" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-sm w-full p-6">
+            <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 mb-4">Edit Address Label</h3>
+            <input type="hidden" id="edit-addr-id">
+            <input type="text" id="edit-addr-label" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm mb-4">
+            <div class="flex items-center gap-2">
+                <button onclick="UI.closeModal('modal-edit-label')" class="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold">Cancel</button>
+                <button onclick="Wallets.submitEditLabel()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">Save Label</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: Payment Details Modal -->
+    <div id="modal-payment-detail" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph ph-receipt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Invoice Details</h3>
+                        <span id="dt-pay-id" class="font-mono text-xs text-indigo-500">PAY-XXXX</span>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-payment-detail')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body (scrollbar hidden) -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <!-- Status Banner & Timer -->
+                <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-zinc-400 block">Status</span>
+                        <span id="dt-pay-status" class="text-xs"></span>
+                    </div>
+                    <div id="dt-timer-container" class="text-right hidden">
+                        <span class="text-[10px] uppercase font-bold text-amber-500 block">Expires In</span>
+                        <span id="dt-pay-timer" class="font-mono font-bold text-xs text-amber-500"></span>
+                    </div>
+                </div>
+
+                <!-- Amount / Network / Gas / Confs -->
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Amount</span>
+                        <div id="dt-pay-amount" class="font-mono font-extrabold text-xs text-zinc-900 dark:text-zinc-100 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Network</span>
+                        <div id="dt-pay-network" class="font-bold text-xs text-zinc-900 dark:text-zinc-100 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Est. Gas Fee</span>
+                        <div id="dt-pay-gas-fee" class="font-mono font-semibold text-xs text-zinc-700 dark:text-zinc-300 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Required Confs</span>
+                        <div id="dt-pay-confs" class="font-mono font-semibold text-xs text-zinc-700 dark:text-zinc-300 mt-0.5"></div>
+                    </div>
+                </div>
+
+                <!-- QR Code (if network selected) -->
+                <div id="dt-qr-wrapper" class="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-center flex flex-col items-center">
+                    <img id="dt-pay-qr-img" class="w-36 h-36 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm mb-2 bg-white p-2" alt="QR Code">
+                    <button type="button" id="dt-btn-download-qr" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mb-2">
+                        <i class="ph ph-download-simple"></i> Save QR Code
+                    </button>
+                    <div class="font-mono text-xs text-zinc-500 break-all select-all px-2" id="dt-pay-address"></div>
+                </div>
+
+                <!-- Tx Hash -->
+                <div id="dt-pay-tx-box" class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 text-xs hidden">
+                    <span class="font-semibold text-zinc-500 block mb-1">On-Chain TxHash:</span>
+                    <span id="dt-pay-tx-hash" class="font-mono text-[11px] break-all text-zinc-700 dark:text-zinc-300"></span>
+                    <a id="dt-pay-tx-explorer" target="_blank" class="block text-indigo-500 hover:underline mt-1">View on Explorer &rarr;</a>
+                </div>
+
+                <!-- Real-Time Blockchain Logs Feed -->
+                <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 text-left space-y-2">
+                    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700/60 pb-2">
+                        <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                            <i class="ph ph-scroll text-indigo-500"></i>
+                            <span>Blockchain Logs & Audit Trail</span>
+                        </span>
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300" id="dt-logs-count">0 logs</span>
+                    </div>
+                    <div id="dt-logs-container" class="space-y-1.5 max-h-48 overflow-y-auto pr-1 font-mono text-[11px] no-scrollbar">
+                        <div class="text-zinc-400 italic text-center py-2">No on-chain events logged yet.</div>
+                    </div>
+                </div>
+
+                <!-- Links -->
+                <div class="space-y-2">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-zinc-500 mb-1">Web Checkout Link</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="dt-pay-web-input" readonly class="w-full px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                            <button type="button" onclick="Payments.copyPaymentLink(document.getElementById('dt-pay-web-input').value, 'Web Checkout Link')" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors" data-tooltip="Copy Web Link">
+                                <i class="ph ph-copy text-base"></i>
+                            </button>
+                            <a id="dt-open-web-btn" target="_blank" class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" data-tooltip="Open Web Checkout">
+                                <i class="ph ph-arrow-square-out text-base"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-zinc-500 mb-1">Telegram Payment Link</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="dt-pay-tg-input" readonly class="w-full px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono">
+                            <button type="button" onclick="Payments.copyPaymentLink(document.getElementById('dt-pay-tg-input').value, 'Telegram Link')" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors" data-tooltip="Copy Telegram Link">
+                                <i class="ph ph-copy text-base"></i>
+                            </button>
+                            <a id="dt-open-tg-btn" target="_blank" class="p-2 rounded-xl bg-sky-500/10 text-sky-500" data-tooltip="Open Telegram Bot">
+                                <i class="ph ph-telegram-logo text-base"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end">
+                <button type="button" onclick="UI.closeModal('modal-payment-detail')" class="px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4B: Outgoing Sent Withdrawal Details Modal -->
+    <div id="modal-withdrawal-detail" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-lg">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Transfer / Withdrawal Details</h3>
+                        <span id="wdr-dt-id" class="font-mono text-xs text-purple-500">WDR-XXXX</span>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-withdrawal-detail')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body (scrollbar hidden) -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <!-- Status Banner -->
+                <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-zinc-400 block">Delivery Status</span>
+                        <span id="wdr-dt-status" class="text-xs"></span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase font-bold text-zinc-400 block">Created At</span>
+                        <span id="wdr-dt-created" class="font-mono text-xs text-zinc-500 dark:text-zinc-400"></span>
+                    </div>
+                </div>
+
+                <!-- Amount / Network / Fee / USD Grid -->
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Amount Sent</span>
+                        <div id="wdr-dt-amount" class="font-mono font-extrabold text-sm text-purple-600 dark:text-purple-400 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">USD Equivalent</span>
+                        <div id="wdr-dt-usd" class="font-mono font-bold text-xs text-zinc-700 dark:text-zinc-300 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Blockchain Network</span>
+                        <div id="wdr-dt-network" class="font-bold text-xs text-zinc-900 dark:text-zinc-100 mt-0.5"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
+                        <span class="text-[10px] text-zinc-400 uppercase font-semibold">Miner / Gas Fee</span>
+                        <div id="wdr-dt-fee" class="font-mono font-semibold text-xs text-zinc-700 dark:text-zinc-300 mt-0.5"></div>
+                    </div>
+                </div>
+
+                <!-- Recipient Destination Address -->
+                <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                    <span class="text-[10px] uppercase font-bold text-zinc-400 block mb-1">External Recipient Address</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <div id="wdr-dt-dest" class="font-mono text-xs text-zinc-900 dark:text-zinc-100 select-all break-all"></div>
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('wdr-dt-dest').textContent); Toast.success('Recipient address copied!');" class="p-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 shrink-0" data-tooltip="Copy Address">
+                            <i class="ph ph-copy text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- On-Chain Tx Hash & Explorer -->
+                <div class="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] uppercase font-bold text-zinc-400">On-Chain Transaction Hash (TxID)</span>
+                        <a id="wdr-dt-explorer-btn" target="_blank" class="text-xs text-indigo-500 hover:underline font-semibold flex items-center gap-1">
+                            <span>Open Explorer</span>
+                            <i class="ph ph-arrow-square-out text-sm"></i>
+                        </a>
+                    </div>
+                    <div id="wdr-dt-tx-hash" class="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 select-all break-all"></div>
+                </div>
+
+                <!-- Secured Chain Intermediate Hops (if enabled) -->
+                <div id="wdr-dt-hops-section" class="hidden p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700/60 pb-2">
+                        <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                            <i class="ph-bold ph-shield-check text-purple-500"></i>
+                            <span>Secured Chain Routing Route</span>
+                        </span>
+                        <span id="wdr-dt-hops-count" class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300"></span>
+                    </div>
+                    <div id="wdr-dt-hops-list" class="space-y-2 font-mono text-xs"></div>
+                </div>
+            </div>
+
+            <!-- Sticky Footer -->
+            <div class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end">
+                <button type="button" onclick="UI.closeModal('modal-withdrawal-detail')" class="px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: Standalone QR View -->
+    <div id="modal-view-qr" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <h3 id="qr-modal-title" class="font-bold text-base text-zinc-900 dark:text-zinc-100 mb-4">Crypto Address</h3>
+            <div id="qr-modal-code" class="flex justify-center mb-4"></div>
+            <div id="qr-modal-address" class="font-mono text-xs text-zinc-500 dark:text-zinc-400 break-all mb-4 select-all"></div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="Wallets.openReceiveFromQrModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all">
+                    <i class="ph ph-arrow-down-left text-sm"></i>
+                    <span>Receive</span>
+                </button>
+                <button type="button" onclick="Wallets.openSendFromQrModal()" class="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/25 transition-all">
+                    <i class="ph-bold ph-paper-plane-tilt text-sm"></i>
+                    <span>Send</span>
+                </button>
+                <button type="button" onclick="UI.closeModal('modal-view-qr')" class="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 6: Send Funds / Withdraw Modal -->
+    <div id="modal-withdraw-funds" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <!-- Sticky Header -->
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-6 sm:px-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-lg">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Send / Withdraw Funds</h3>
+                        <p class="text-xs text-zinc-400">Transfer crypto to external address with optional Secured Chain</p>
+                    </div>
+                </div>
+                <button onclick="UI.closeModal('modal-withdraw-funds')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Body (scrollbar hidden) -->
+            <div class="modal-body flex-1 overflow-y-auto p-6 sm:px-8 space-y-4 no-scrollbar">
+                <!-- Main Form -->
+                <div id="withdraw-form-container" class="space-y-4">
+                    <!-- Source Wallet -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">Source Vault Wallet</label>
+                        <div id="withdraw-wallet-dropdown"></div>
+                    </div>
+
+                    <!-- Network / Asset Selection -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Cryptocurrency & Network</label>
+                            <span id="withdraw-avail-badge" class="text-xs font-mono text-zinc-500 dark:text-zinc-400">Available: 0.00</span>
+                        </div>
+                        <div id="withdraw-network-dropdown"></div>
+                    </div>
+
+                    <!-- External Destination Address -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">External Recipient Address</label>
+                        <div class="relative">
+                            <input type="text" id="withdraw-dest-input" oninput="Wallets.onWithdrawDestChanged()" placeholder="Paste external crypto address..." class="w-full px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                        </div>
+                        <div id="withdraw-dest-feedback" class="hidden text-[11px] mt-1 font-medium"></div>
+                    </div>
+
+                    <!-- Amount with Dual Currency and USD inputs -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Withdrawal Amount</label>
+                            <span id="withdraw-amount-usd-badge" class="text-xs font-mono text-zinc-400 font-medium">~$0.00 USD</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <!-- Crypto Amount -->
+                            <div class="relative flex items-center">
+                                <input type="number" min="0" step="any" id="withdraw-amount-input" oninput="Wallets.onWithdrawCryptoAmountChanged()" placeholder="0.00" class="w-full pl-3 pr-14 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                                <span id="withdraw-amount-currency-label" class="absolute right-3 text-xs font-bold text-zinc-400 select-none">BTC</span>
+                            </div>
+                            <!-- USD Equivalent Amount (Bi-directional Sync) -->
+                            <div class="relative flex items-center">
+                                <span class="absolute left-3 text-xs font-bold text-zinc-400 select-none">$</span>
+                                <input type="number" min="0" step="any" id="withdraw-amount-usd-input" oninput="Wallets.onWithdrawUsdAmountChanged()" placeholder="0.00" class="w-full pl-7 pr-16 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                                <button type="button" onclick="Wallets.setWithdrawMaxAmount()" class="absolute right-2 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 font-bold text-xs">
+                                    MAX
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Secured Multi-Hop Chain Option (Default OFF) -->
+                    <div class="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-sm">
+                                    <i class="ph-bold ph-shield-check"></i>
+                                </div>
+                                <div>
+                                    <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100 block">Secured Chain Routing</span>
+                                    <span class="text-[11px] text-zinc-400">Multi-hop stealth proxy transfers (breaks cluster analysis)</span>
+                                </div>
+                            </div>
+
+                            <!-- Toggle Switch (Default: false) -->
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="withdraw-secured-toggle" onchange="Wallets.toggleSecuredChainUI()" class="sr-only peer">
+                                <div class="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Secured Chain Extended Configuration (Hidden by default) -->
+                        <div id="withdraw-secured-options" class="hidden space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-700/60">
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Intermediate Stealth Hops</label>
+                                    <span class="text-[11px] font-bold text-indigo-500" id="withdraw-hops-count-display">2 Hops</span>
+                                </div>
+                                <div class="grid grid-cols-5 gap-1.5" id="withdraw-hops-buttons">
+                                    <button type="button" onclick="Wallets.setWithdrawHops(1)" class="withdraw-hop-btn py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold hover:border-indigo-500 transition-all" data-hops="1">1 Hop</button>
+                                    <button type="button" onclick="Wallets.setWithdrawHops(2)" class="withdraw-hop-btn py-1.5 rounded-xl border border-indigo-500 bg-indigo-500/10 text-indigo-500 text-xs font-bold transition-all" data-hops="2">2 Hops</button>
+                                    <button type="button" onclick="Wallets.setWithdrawHops(3)" class="withdraw-hop-btn py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold hover:border-indigo-500 transition-all" data-hops="3">3 Hops</button>
+                                    <button type="button" onclick="Wallets.setWithdrawHops(4)" class="withdraw-hop-btn py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold hover:border-indigo-500 transition-all" data-hops="4">4 Hops</button>
+                                    <button type="button" onclick="Wallets.toggleCustomHopsInput()" id="withdraw-custom-hops-btn" class="withdraw-hop-btn py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold hover:border-indigo-500 transition-all" data-hops="custom">Custom</button>
+                                </div>
+                                <div id="withdraw-custom-hops-container" class="hidden mt-2 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between gap-3">
+                                    <span class="text-xs text-zinc-600 dark:text-zinc-300 font-medium">Custom Intermediate Hops:</span>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="withdraw-custom-hops-input" min="1" max="10000" value="5" oninput="Wallets.onCustomHopsChanged(this.value)" class="w-24 px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-xs font-mono font-bold text-center">
+                                        <span class="text-[11px] font-mono text-zinc-400">hops</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Routing Visualization Path -->
+                            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                                <span class="text-[10px] uppercase font-bold text-zinc-400 block mb-2">Routing Pipeline Preview</span>
+                                <div id="withdraw-routing-diagram" class="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                                    <!-- Generated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estimated Gas Fees with USD Conversion -->
+                    <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
+                        <span class="text-zinc-500">Est. Network Miner Fee:</span>
+                        <span id="withdraw-fee-est" class="font-mono font-semibold text-zinc-700 dark:text-zinc-300">0.0001 (~$0.01 USD)</span>
+                    </div>
+                </div>
+
+                <!-- Receipt & Hop Details Screen (shown after broadcast) -->
+                <div id="withdraw-receipt-container" class="hidden space-y-4">
+                    <div class="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 text-center">
+                        <div id="receipt-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
+                            <i class="ph ph-spinner animate-spin"></i>
+                            <span>BROADCASTING TO MEMPOOL</span>
+                        </div>
+                        <h4 class="font-bold text-base text-zinc-900 dark:text-zinc-100" id="receipt-title">Transfer Broadcasted!</h4>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1" id="receipt-desc">Transaction broadcasted to network. Tracking links generated below.</p>
+                        <div class="mt-3 flex items-center justify-center gap-2">
+                            <span class="text-xs font-mono text-zinc-400">Tracking ID:</span>
+                            <span id="receipt-tracking-id" class="text-xs font-mono font-bold text-indigo-500 select-all">PAY-...</span>
+                        </div>
+                    </div>
+
+                    <!-- Client Shareable Tracking Links -->
+                    <div class="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                <i class="ph-bold ph-share-network text-indigo-500"></i>
+                                <span>Send Tracking Link to Client</span>
+                            </div>
+                            <span class="text-[10px] text-zinc-400 font-medium">Real-time status updates</span>
+                        </div>
+
+                        <!-- Web Tracking Link -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Web Tracking Page</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="text" id="receipt-web-link" readonly class="flex-1 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono text-zinc-700 dark:text-zinc-300 select-all">
+                                <button type="button" onclick="Wallets.copyReceiptLink('receipt-web-link', 'Web Tracking Link')" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-1 shadow-sm transition-all">
+                                    <i class="ph ph-copy text-sm"></i>
+                                    <span>Copy</span>
+                                </button>
+                                <a id="receipt-web-open" href="#" target="_blank" class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors" data-tooltip="Open Web Tracking">
+                                    <i class="ph ph-arrow-square-out text-base"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Telegram Bot Link -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Telegram Bot Live Settlement Tracker</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="text" id="receipt-tg-link" readonly class="flex-1 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono text-zinc-700 dark:text-zinc-300 select-all">
+                                <button type="button" onclick="Wallets.copyReceiptLink('receipt-tg-link', 'Telegram Bot Link')" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs flex items-center gap-1 shadow-sm transition-all">
+                                    <i class="ph ph-telegram-logo text-sm"></i>
+                                    <span>Copy</span>
+                                </button>
+                                <a id="receipt-tg-open" href="#" target="_blank" class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sky-500 transition-colors" data-tooltip="Open Telegram Bot">
+                                    <i class="ph ph-arrow-square-out text-base"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transfer Details (TxHash & Destination) -->
+                    <div class="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-zinc-500">Destination:</span>
+                            <span id="receipt-dest-address" class="font-mono font-semibold text-zinc-800 dark:text-zinc-200 break-all select-all max-w-[240px] truncate text-right"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-zinc-500">TxHash:</span>
+                            <span id="receipt-tx-hash" class="font-mono text-zinc-800 dark:text-zinc-200 break-all select-all max-w-[240px] truncate text-right">Broadcasting...</span>
+                        </div>
+                        <div id="receipt-explorer-container" class="hidden text-right pt-1">
+                            <a id="receipt-explorer-link" href="#" target="_blank" class="text-indigo-500 hover:underline font-semibold inline-flex items-center gap-1">
+                                <span>View on Blockchain Explorer</span>
+                                <i class="ph ph-arrow-square-out"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Hop Chain Breakdown (for Secured Chain) -->
+                    <div id="receipt-hops-card" class="hidden p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                        <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700/60 pb-2">
+                            <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                <i class="ph ph-git-commit text-indigo-500"></i>
+                                <span>Secured Stealth Hops Execution</span>
+                            </span>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300" id="receipt-hops-count">2 Hops</span>
+                        </div>
+
+                        <div id="receipt-hops-list" class="space-y-2 max-h-48 overflow-y-auto pr-1 font-mono text-[11px] no-scrollbar">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="button" onclick="Wallets.closeWithdrawReceipt()" class="w-full py-3 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold text-xs transition-colors">
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Modal Footer for Withdraw -->
+            <div id="withdraw-modal-footer" class="modal-footer sticky bottom-0 bg-white dark:bg-zinc-900 z-30 p-4 sm:px-8 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button type="button" onclick="UI.closeModal('modal-withdraw-funds')" class="px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-submit-withdraw" onclick="Wallets.submitWithdrawal()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/25 transition-all flex items-center gap-2">
+                    <i class="ph-bold ph-paper-plane-tilt text-base"></i>
+                    <span>Confirm & Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: How to Get Telegram Credentials -->
+    <div id="modal-how-to-get-telegram" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="UI.closeModal('modal-how-to-get-telegram')"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh] overflow-hidden no-scrollbar">
+            <div class="modal-header sticky top-0 bg-white dark:bg-zinc-900 z-30 p-5 sm:px-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph-fill ph-telegram-logo text-sky-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100" id="how-to-get-title">Telegram Credentials Guide</h3>
+                        <p class="text-[11px] text-zinc-400">Step-by-step instructions to obtain your keys</p>
+                    </div>
+                </div>
+                <button type="button" onclick="UI.closeModal('modal-how-to-get-telegram')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Tab Switcher inside Modal -->
+            <div class="p-3 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 flex gap-2">
+                <button type="button" id="how-tab-api" onclick="Settings.switchHowToGetTab('api_credentials')" class="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition-all cursor-pointer">
+                    API ID & API Hash
+                </button>
+                <button type="button" id="how-tab-bot" onclick="Settings.switchHowToGetTab('bot_token')" class="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer">
+                    Bot Token (@BotFather)
+                </button>
+            </div>
+
+            <div class="modal-body flex-1 overflow-y-auto p-5 sm:px-6 space-y-4 no-scrollbar">
+                <!-- Guide: API ID & Hash -->
+                <div id="how-content-api" class="space-y-3.5 text-xs text-zinc-600 dark:text-zinc-300">
+                    <div class="p-3 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/50 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                        <i class="ph-bold ph-info text-base mr-1 align-middle"></i>
+                        The <strong>API ID</strong> and <strong>API Hash</strong> authenticate your Telethon client to Telegram's core network.
+                    </div>
+                    <ol class="space-y-3 list-decimal list-inside leading-relaxed text-zinc-700 dark:text-zinc-300">
+                        <li>
+                            Open <a href="https://my.telegram.org" target="_blank" class="text-indigo-600 dark:text-indigo-400 font-bold underline">my.telegram.org</a> in your browser.
+                        </li>
+                        <li>
+                            Enter your phone number (with country code) and submit the verification code sent to your Telegram app.
+                        </li>
+                        <li>
+                            Click on <strong>API development tools</strong>.
+                        </li>
+                        <li>
+                            Fill in <strong>App title</strong> (e.g. <em>JVault Gateway</em>) and <strong>Short name</strong> (e.g. <em>jvault</em>). Select <em>Desktop</em> or <em>Web</em> as platform.
+                        </li>
+                        <li>
+                            Click <strong>Create application</strong>.
+                        </li>
+                        <li>
+                            Copy your numeric <strong>App api_id</strong> into the <em>Telegram API ID</em> field, and your 32-character <strong>App api_hash</strong> into the <em>Telegram API Hash</em> field.
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Guide: Bot Token -->
+                <div id="how-content-bot" class="hidden space-y-3.5 text-xs text-zinc-600 dark:text-zinc-300">
+                    <div class="p-3 rounded-2xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/50 dark:border-sky-900/30 text-sky-700 dark:text-sky-300">
+                        <i class="ph-bold ph-robot text-base mr-1 align-middle"></i>
+                        The <strong>Bot Token</strong> links your automated checkout responder to your dedicated Telegram bot.
+                    </div>
+                    <ol class="space-y-3 list-decimal list-inside leading-relaxed text-zinc-700 dark:text-zinc-300">
+                        <li>
+                            Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" class="text-sky-600 dark:text-sky-400 font-bold underline">@BotFather</a> (official verified bot).
+                        </li>
+                        <li>
+                            Click <strong>Start</strong> and send the command: <code class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono font-bold text-sky-500">/newbot</code>
+                        </li>
+                        <li>
+                            Choose a friendly display name for your bot (e.g. <em>JVault Checkout Bot</em>).
+                        </li>
+                        <li>
+                            Choose a unique username ending in <code>bot</code> (e.g. <em>MyJVaultPay_bot</em>).
+                        </li>
+                        <li>
+                            BotFather will generate your HTTP API token (e.g. <code>123456789:ABCdefGHIjklmno...</code>).
+                        </li>
+                        <li>
+                            Copy and paste the entire token string into the <strong>Bot Token</strong> field in JVault Settings.
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="modal-footer p-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                <button type="button" onclick="UI.closeModal('modal-how-to-get-telegram')" class="px-5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer">
+                    Close Guide
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Create Encrypted Backup (.jvault) -->
+    <div id="modal-backup-jvault" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="UI.closeModal('modal-backup-jvault')"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden">
+            <div class="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-lg">
+                        <i class="ph-bold ph-shield-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">Create Encrypted Backup</h3>
+                        <p class="text-[11px] text-zinc-400">Secure AES-256 .jvault snapshot</p>
+                    </div>
+                </div>
+                <button type="button" onclick="UI.closeModal('modal-backup-jvault')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    Set a <strong>6-character PIN</strong> (combination of letters and numbers). This PIN encrypts all your wallets, keystores, transactions, addresses, and settings into a protected <code>.jvault</code> file.
+                </p>
+
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2.5 text-center">
+                        6-Character Encryption PIN
+                    </label>
+                    <div id="backup-otp-container" class="flex items-center justify-center gap-2">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="0" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="1" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="2" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="3" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="4" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-sm" data-index="5" autocomplete="off" inputmode="text">
+                    </div>
+                    <p id="backup-pin-hint" class="text-[11px] text-zinc-400 mt-2 text-center">Must be exactly 6 letters & numbers.</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-start gap-2">
+                    <i class="ph-bold ph-warning text-base shrink-0 mt-0.5"></i>
+                    <span>Remember this PIN! You cannot decrypt or restore this backup without it.</span>
+                </div>
+            </div>
+
+            <div class="p-4 sm:px-6 bg-zinc-50 dark:bg-zinc-900/60 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="UI.closeModal('modal-backup-jvault')" class="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="btn-execute-backup" onclick="Settings.executeBackup()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                    <i class="ph-bold ph-download-simple"></i>
+                    <span>Download .jvault</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Restore Encrypted Backup (.jvault) -->
+    <div id="modal-restore-jvault" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="UI.closeModal('modal-restore-jvault')"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
+            <div class="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-lg">
+                        <i class="ph-bold ph-upload-simple"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm text-zinc-900 dark:text-zinc-100">Restore .jvault Backup</h3>
+                        <p class="text-[11px] text-zinc-400">Import and decrypt your treasury snapshot</p>
+                    </div>
+                </div>
+                <button type="button" onclick="UI.closeModal('modal-restore-jvault')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-5">
+                <!-- Custom Drag & Drop File Zone -->
+                <div id="restore-drop-zone" onclick="document.getElementById('restore-file-input').click()" ondragover="Settings.onRestoreDragOver(event)" ondragleave="Settings.onRestoreDragLeave(event)" ondrop="Settings.onRestoreDrop(event)" class="border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-zinc-50/50 dark:bg-zinc-800/20">
+                    <input type="file" id="restore-file-input" accept=".jvault" class="hidden" onchange="Settings.onRestoreFileSelected(this.files)">
+                    <div id="restore-drop-empty">
+                        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-2xl mb-2">
+                            <i class="ph-bold ph-file-arrow-up"></i>
+                        </div>
+                        <h4 class="text-xs font-bold text-zinc-800 dark:text-zinc-200">Drag and drop your .jvault file here</h4>
+                        <p class="text-[11px] text-zinc-400 mt-0.5">or click to browse from your device</p>
+                    </div>
+                    <div id="restore-drop-selected" class="hidden flex items-center justify-between p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-left">
+                        <div class="flex items-center gap-2.5 overflow-hidden">
+                            <i class="ph-bold ph-file-lock text-xl text-indigo-500 shrink-0"></i>
+                            <div class="overflow-hidden">
+                                <div id="restore-file-name" class="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">backup.jvault</div>
+                                <div id="restore-file-size" class="text-[10px] text-zinc-400">0 KB</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-semibold text-indigo-500 hover:underline shrink-0 ml-2">Change</span>
+                    </div>
+                </div>
+
+                <!-- PIN Input (Appears when file is selected) -->
+                <div id="restore-pin-section" class="hidden space-y-2">
+                    <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 text-center">
+                        Enter 6-Character Decryption PIN
+                    </label>
+                    <div id="restore-otp-container" class="flex items-center justify-center gap-2">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="0" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="1" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="2" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="3" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="4" autocomplete="off" inputmode="text">
+                        <input type="text" maxlength="1" class="w-11 h-14 text-center font-mono text-xl font-extrabold rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-4 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm" data-index="5" autocomplete="off" inputmode="text">
+                    </div>
+                    <p class="text-[11px] text-zinc-400 text-center">Enter the exact 6-character PIN used when this backup was created.</p>
+                </div>
+            </div>
+
+            <div class="p-4 sm:px-6 bg-zinc-50 dark:bg-zinc-900/60 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="UI.closeModal('modal-restore-jvault')" class="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="btn-proceed-restore" disabled onclick="Settings.openRestoreConfirmModal()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span>Proceed to Restore &rarr;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Restore Confirmation Warning -->
+    <div id="modal-restore-confirm" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="UI.closeModal('modal-restore-confirm')"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden">
+            <div class="p-6 text-center space-y-4">
+                <div class="w-16 h-16 mx-auto rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-3xl">
+                    <i class="ph-bold ph-warning-octagon"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100">Warning: Current Data Will Be Overwritten!</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
+                        Restoring will overwrite all current wallets, keystores, addresses, transactions, and settings in your JVault gateway.
+                    </p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-left text-xs text-amber-700 dark:text-amber-300">
+                    <p class="font-semibold mb-1">We suggest that you copy or back up your current data first.</p>
+                    <p class="text-[11px] opacity-80">If you proceed without backing up, unsaved changes since your last backup cannot be recovered.</p>
+                </div>
+            </div>
+
+            <div class="p-4 sm:px-6 bg-zinc-50 dark:bg-zinc-900/60 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+                <button type="button" onclick="Settings.backupCurrentFirst()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                    <i class="ph-bold ph-shield-check"></i>
+                    <span>Backup Current Data First</span>
+                </button>
+                <button type="button" id="btn-confirm-overwrite-restore" onclick="Settings.executeRestore()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>Overwrite & Restore Now</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Danger Zone - Self-Destroy Data (Sticky, No Backdrop Click, No X, 10s Counter, 3s Hold to Cancel) -->
+    <div id="modal-self-destroy" class="modal-root modal-hidden hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Sticky Backdrop with NO click-to-close listener -->
+        <div class="fixed inset-0 bg-black/85 backdrop-blur-md"></div>
+        <div class="modal-content relative bg-white dark:bg-zinc-950 border-2 border-rose-500/50 rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden text-center z-10">
+            <!-- Pulsing Danger Ambient Glow -->
+            <div class="absolute -top-20 -left-20 w-48 h-48 bg-rose-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-20 -right-20 w-48 h-48 bg-rose-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="p-6 sm:p-8 pb-8 sm:pb-10 space-y-5 relative z-10">
+                <!-- Warning Skull Icon -->
+                <div class="w-16 h-16 mx-auto rounded-3xl bg-rose-500/15 border border-rose-500/30 text-rose-500 flex items-center justify-center text-3xl shadow-lg shadow-rose-500/20 animate-pulse">
+                    <i class="ph-bold ph-skull"></i>
+                </div>
+
+                <div>
+                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-500/20 text-rose-500 border border-rose-500/40 inline-block mb-2">
+                        EMERGENCY SELF-DESTRUCTION
+                    </span>
+                    <h3 class="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">Self-Destroy Gateway Data</h3>
+                </div>
+
+                <!-- 10s Circular Countdown Display -->
+                <div class="py-2">
+                    <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
+                        <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="42" stroke="currentColor" stroke-width="6" fill="transparent" class="text-zinc-200 dark:text-zinc-800"/>
+                            <circle id="self-destroy-circle" cx="50" cy="50" r="42" stroke="currentColor" stroke-width="6" fill="transparent" stroke-dasharray="264" stroke-dashoffset="0" class="text-rose-500 transition-all duration-1000 ease-linear"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="self-destroy-timer-text" class="text-3xl font-black font-mono text-rose-500 tracking-tight">10s</span>
+                            <span class="text-[9px] uppercase font-bold text-zinc-400 -mt-1">REMAINING</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Description warning -->
+                <div class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 space-y-1.5 leading-relaxed text-center select-none">
+                    <p class="font-bold text-sm flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-warning"></i>
+                        <span>Permanent & Irreversible Purge</span>
+                    </p>
+                    <p>
+                        All wallets, master seed phrases, private keys, derived addresses, payments, and gateway records will be permanently vanished and purged. Data can <strong>NEVER</strong> be restored.
+                    </p>
+                </div>
+
+                <!-- Hold 3s to Cancel Button -->
+                <div class="pt-3 pb-3">
+                    <button type="button" id="btn-self-destroy-cancel" 
+                        onmousedown="Settings.startCancelHold()" 
+                        onmouseup="Settings.stopCancelHold()" 
+                        onmouseleave="Settings.stopCancelHold()"
+                        ontouchstart="Settings.startCancelHold(event)" 
+                        ontouchend="Settings.stopCancelHold(event)"
+                        class="relative w-full py-3.5 px-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border-2 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs shadow-lg overflow-hidden select-none active:scale-[0.98] transition-transform cursor-pointer">
+                        <!-- Hold Fill Progress Bar -->
+                        <div id="cancel-hold-bar" class="absolute inset-0 bg-emerald-500/25 dark:bg-emerald-500/30 w-0 transition-none pointer-events-none"></div>
+                        <div class="relative z-10 flex items-center justify-center gap-2">
+                            <i id="cancel-hold-icon" class="ph-bold ph-hand-tap text-base"></i>
+                            <span id="cancel-hold-label">Hold to Cancel (3s)</span>
+                        </div>
+                    </button>
+                    <p id="cancel-hold-hint" class="text-xs text-zinc-500 dark:text-zinc-400 mt-4 px-2 font-medium leading-relaxed pb-2">Press and hold button for 3 full seconds to abort sequence</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Crypto Price Ticker & Currency Calculator Widget (Bottom Left) -->
+    <div id="floating-price-launcher" class="hidden fixed bottom-6 left-6 z-40">
+        <button onclick="PriceTicker.toggleModal()" class="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-zinc-800 text-white border border-zinc-700/80 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center transition-all group relative cursor-pointer" data-tooltip="Live Crypto Rates & Calculator">
+            <span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-zinc-900 dark:ring-zinc-800 animate-pulse"></span>
+            <i class="ph-bold ph-chart-line-up text-xl text-emerald-400 group-hover:scale-110 transition-transform"></i>
+        </button>
+    </div>
+
+    <!-- Floating Price Ticker & Calculator Modal (Bottom Left) -->
+    <div id="floating-price-modal" class="hidden fixed bottom-20 left-6 z-50 w-80 sm:w-96 rounded-3xl bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[520px] transition-all">
+        <!-- Header -->
+        <div class="p-4 sm:px-5 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-900/80">
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <i class="ph-bold ph-chart-line-up text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-xs text-zinc-900 dark:text-zinc-100">Live Crypto Rates</h3>
+                    <div class="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span>Auto-updates:</span>
+                        <span id="ticker-last-updated" class="font-mono text-zinc-500">Live</span>
+                    </div>
+                </div>
+            </div>
+            <button onclick="PriceTicker.closeModal()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <i class="ph ph-x text-base"></i>
+            </button>
+        </div>
+
+        <!-- Sub Tabs (Ticker vs Calculator) -->
+        <div class="p-2 border-b border-zinc-100 dark:border-zinc-800/60 bg-zinc-100/60 dark:bg-zinc-900/40 flex items-center gap-1">
+            <button id="ticker-tab-btn" onclick="PriceTicker.switchSubTab('ticker')" class="flex-1 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+                <i class="ph ph-trend-up"></i>
+                <span>Market Prices</span>
+            </button>
+            <button id="calc-tab-btn" onclick="PriceTicker.switchSubTab('calculator')" class="flex-1 py-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all">
+                <i class="ph ph-calculator"></i>
+                <span>Converter</span>
+            </button>
+        </div>
+
+        <!-- Tab 1: Live Ticker Stream -->
+        <div id="ticker-pane-container" class="flex-1 overflow-y-auto p-3 space-y-2 no-scrollbar max-h-80">
+            <div id="ticker-crypto-list" class="space-y-1.5"></div>
+        </div>
+
+        <!-- Tab 2: Calculator / Converter -->
+        <div id="calc-pane-container" class="hidden flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar">
+            <div>
+                <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Amount to Convert</label>
+                <input type="number" min="0" step="any" id="calc-amount-input" value="1" oninput="PriceTicker.calculateConversion()" class="w-full px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div class="flex-1">
+                    <label class="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">From</label>
+                    <select id="calc-from-select" onchange="PriceTicker.calculateConversion()" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-bold text-zinc-900 dark:text-zinc-100"></select>
+                </div>
+
+                <div class="pt-4 shrink-0">
+                    <button onclick="PriceTicker.swapCurrencies()" class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors" data-tooltip="Swap Currencies">
+                        <i class="ph-bold ph-arrows-down-up text-base"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1">
+                    <label class="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">To</label>
+                    <select id="calc-to-select" onchange="PriceTicker.calculateConversion()" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-bold text-zinc-900 dark:text-zinc-100"></select>
+                </div>
+            </div>
+
+            <!-- Conversion Result Box -->
+            <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-emerald-500/10 border border-indigo-500/20 text-center space-y-1">
+                <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Converted Equivalent</span>
+                <div id="calc-result-display" class="text-xl font-extrabold font-mono text-zinc-900 dark:text-zinc-100">$82,500.00</div>
+                <div id="calc-rate-formula" class="text-[11px] font-mono text-indigo-500 dark:text-indigo-400">1 BTC = 82,500.00 USD</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-2.5 px-4 bg-zinc-50/80 dark:bg-zinc-900/60 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-400">
+            <span>Binance Real-Time Liquidity Feed</span>
+            <span class="text-emerald-500 font-semibold">&bull; 0% Spread</span>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/icons.js?v=20261023_4"></script>
+    <script src="/static/js/toast.js?v=20261023_4"></script>
+    <script src="/static/js/theme.js?v=20261023_4"></script>
+    <script src="/static/js/modals.js?v=20261023_4"></script>
+    <script src="/static/js/dropdowns.js?v=20261023_4"></script>
+    <script src="/static/js/api.js?v=20261023_4"></script>
+    <script src="/static/js/auth.js?v=20261023_4"></script>
+    <script src="/static/js/price_ticker.js?v=20261023_4"></script>
+    <script src="/static/js/wallets.js?v=20261023_4"></script>
+    <script src="/static/js/payments.js?v=20261023_4"></script>
+    <script src="/static/js/fast_receive.js?v=20261023_4"></script>
+    <script src="/static/js/settings.js?v=20261023_4"></script>
+    <script src="/static/js/app.js?v=20261023_4"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+// Crypto icons library helper providing crisp official SVG icons
+const CryptoIcons = {
+    icons: {
+        btc: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#F7931A"/><path d="M22.5 13.8c.3-2.1-1.3-3.3-3.5-4l.7-2.9-1.8-.4-.7 2.8c-.5-.1-1-.2-1.5-.3l.7-2.8-1.8-.4-.7 2.9c-.4-.1-.8-.2-1.1-.3l-2.4-.6-.5 1.9s1.3.3 1.3.3c.7.2.8.7.8 1.1l-.8 3.3c0 .1.1.2.2.2l-.2-.1-1.2 4.7c-.1.2-.3.6-.8.4 0 0-1.3-.3-1.3-.3l-.9 2.1 2.3.6c.4.1.9.2 1.3.3l-.7 2.9 1.8.4.7-2.9c.5.1 1 .2 1.5.3l-.7 2.9 1.8.4.7-2.9c3.1.6 5.4.3 6.4-2.4.8-2.2 0-3.5-1.6-4.3 1.1-.3 2-1 2.2-2.5zm-3.9 5.6c-.6 2.3-4.5 1-5.7.8l1-4.1c1.3.3 5.3 1 4.7 3.3zm.5-5.8c-.5 2.1-3.7 1-4.8.8l.9-3.8c1.1.3 4.4.9 3.9 3z" fill="#fff"/></svg>`,
+        eth: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#627EEA"/><g fill="#fff"><path d="M16.5 4v8.9l7.5 3.3L16.5 4z" fill-opacity=".6"/><path d="M16.5 4L9 16.2l7.5-3.3V4z"/><path d="M16.5 21.9v6.1L24 17.6l-7.5 4.3z" fill-opacity=".6"/><path d="M16.5 28v-6.1L9 17.6l7.5 10.4z"/><path d="M16.5 20.5l7.5-4.3-7.5-3.4v7.7z" fill-opacity=".2"/><path d="M9 16.2l7.5 4.3v-7.7L9 16.2z" fill-opacity=".6"/></g></svg>`,
+        sol: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M9.5 20.8a1 1 0 01.7-.3h12.5a.6.6 0 01.4 1l-2.4 2.4a1 1 0 01-.7.3H7.5a.6.6 0 01-.4-1l2.4-2.4zm0-9.6a1 1 0 01.7-.3h12.5a.6.6 0 01.4 1l-2.4 2.4a1 1 0 01-.7.3H7.5a.6.6 0 01-.4-1l2.4-2.4zm13 4.8a1 1 0 01-.7.3H9.3a.6.6 0 01-.4-1l2.4-2.4a1 1 0 01.7-.3h12.5a.6.6 0 01.4 1l-2.4 2.4z" fill="url(#sol_grad)"/><defs><linearGradient id="sol_grad" x1="6.8" y1="24.2" x2="23.2" y2="7.8" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs></svg>`,
+        trx: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#EF0027"/><path d="M7 8l16 3-13 14L7 8zm1.5 2.1l7.8 8.4-7.8-8.4zm9.3 8.3L23.4 12l-5.6 6.4z" fill="#fff"/></svg>`,
+        bnb: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><g fill="#fff"><path d="M12.1 13.9l3.9-3.9 3.9 3.9 2.3-2.3-6.2-6.2-6.2 6.2 2.3 2.3zM7.5 16l2.3-2.3 2.3 2.3-2.3 2.3L7.5 16zm4.6 2.1l3.9 3.9 3.9-3.9 2.3 2.3-6.2 6.2-6.2-6.2 2.3-2.3zm7.7-2.1l2.3-2.3 2.3 2.3-2.3 2.3-2.3-2.3zM16 13.7l2.3 2.3-2.3 2.3-2.3-2.3 2.3-2.3z"/></g></svg>`,
+        matic: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M21.2 13.3l-3.8-2.2a2.8 2.8 0 00-2.8 0l-3.8 2.2a2.8 2.8 0 00-1.4 2.4v4.4a2.8 2.8 0 001.4 2.4l3.8 2.2a2.8 2.8 0 002.8 0l3.8-2.2a2.8 2.8 0 001.4-2.4v-4.4a2.8 2.8 0 00-1.4-2.4zm-1.1 5.8a.7.7 0 01-.3.6l-3.5 2a.7.7 0 01-.7 0l-3.5-2a.7.7 0 01-.3-.6v-4.1a.7.7 0 01.3-.6l3.5-2a.7.7 0 01.7 0l3.5 2a.7.7 0 01.3.6v4.1z" fill="#fff"/></svg>`,
+        ton: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#0088CC"/><path d="M19.9 8.5H12.1a2.1 2.1 0 00-2.1 2.1c0 .4.1.8.3 1.1l5.4 11.2a.6.6 0 001 0l5.4-11.2c.2-.3.3-.7.3-1.1a2.1 2.1 0 00-2.2-2.1zm-3.9 11.5l-4-8.3h8l-4 8.3z" fill="#fff"/></svg>`,
+        ltc: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#345D9D"/><path d="M15.4 7.5h3.4l-2.4 9.1 2.6-.9-.6 2.3-2.6.9-.9 3.5h7.3l-.7 2.6H11.5l4-15.1.7-2.4z" fill="#fff"/></svg>`,
+        doge: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#C2A633"/><path d="M13.5 8h4.8c4.2 0 6.7 2.6 6.7 6.4 0 4.1-2.6 6.8-6.9 6.8h-4.6V8zm3.2 10.4h1.7c2.3 0 3.7-1.3 3.7-3.6 0-2.2-1.4-3.5-3.7-3.5h-1.7v7.1zM10.8 14.2h5.5v2.2h-5.5v-2.2z" fill="#fff"/></svg>`,
+        arb: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#28A0F0"/><path d="M16 6.5l8.7 15h-3.9l-4.8-8.5-2.7 4.7 3.3 3.8H12.8L10 18l6-11.5z" fill="#fff"/></svg>`,
+        usdt: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path d="M17.9 14.5v-2.4h5.2V9.6H8.9v2.5h5.2v2.4c-4.7.2-8.2 1.2-8.2 2.4s3.5 2.2 8.2 2.4v6.8h3.8v-6.8c4.7-.2 8.2-1.2 8.2-2.4s-3.5-2.2-8.2-2.4zm0 3.6c-3.7-.2-6.5-.8-6.5-1.5s2.8-1.3 6.5-1.5v3zm-3.8 0c-3.7-.2-6.5-.8-6.5-1.5s2.8-1.3 6.5-1.5v3z" fill="#fff"/></svg>`,
+        usdc: `<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path d="M16 6a10 10 0 100 20 10 10 0 000-20zm.8 14.8v1.6h-1.6v-1.6c-1.7-.2-2.8-1.2-2.9-2.5h1.7c.1.7.7 1.2 1.7 1.2 1.1 0 1.6-.5 1.6-1.1 0-.7-.5-1-1.8-1.3-1.9-.5-2.8-1.2-2.8-2.5 0-1.3 1-2.3 2.5-2.5V9.6h1.6v1.6c1.4.2 2.4 1 2.5 2.2h-1.6c-.1-.6-.6-1-1.4-1-1 0-1.4.5-1.4 1 0 .6.4.9 1.6 1.2 2 .5 3 1.2 3 2.6-.1 1.5-1.2 2.4-2.7 2.6z" fill="#fff"/></svg>`
+    },
+
+    get(name, size = 24) {
+        if (!name) name = "btc";
+        const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const svg = this.icons[key] || this.icons['btc'];
+        return `<div class="inline-flex items-center justify-center shrink-0" style="width:${size}px; height:${size}px;">${svg}</div>`;
+    }
+};

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="jv-fav-grad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#9333EA"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#jv-fav-grad)"/>
+  <!-- J Vault Minimal Symbol -->
+  <rect x="23" y="12" width="8" height="3.5" rx="1.75" fill="#FFFFFF"/>
+  <path d="M27.5 14V27C27.5 30.5899 24.5899 33.5 21 33.5C17.4101 33.5 14.5 30.5899 14.5 27C14.5 26.1716 15.1716 25.5 16 25.5C16.8284 25.5 17.5 26.1716 17.5 27C17.5 28.933 19.067 30.5 21 30.5C22.933 30.5 24.5 28.933 24.5 27V14H27.5Z" fill="#FFFFFF"/>
+  <circle cx="21" cy="20.5" r="2" fill="#FFFFFF"/>
+</svg>

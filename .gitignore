@@ -1,0 +1,75 @@
+# ==========================================
+# JVault - Git Ignore Configuration
+# Protects private keys, databases & session files
+# ==========================================
+
+# Database & SQLite files (Master keys, wallets, transactions)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+api/data/*.db
+api/data/*.sqlite*
+vaultix.db
+jvault.db
+
+# Telethon & Telegram MTProto session files
+*.session
+*.session-journal
+api/data/*.session
+api/data/*.session-journal
+
+# Encrypted backups & archives
+*.vaultix
+*.bak
+*.backup
+*.zip
+*.tar.gz
+
+# Pre-rendered QR code cache
+api/data/qr_codes/*
+!api/data/qr_codes/.gitkeep
+
+# Sensitive local configurations
+config.ini
+.env
+.env.*
+*.local.ini
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+
+# Editor & IDE settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.cursor/
+
+# Scratch & test scripts
+test_edits.py
+test_logo_a.png
+test_emblem_v1.svg
+scratch/
